@@ -35,7 +35,7 @@ os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 # ModelScope Configuration
 _cfg = configparser.ConfigParser()
 _cfg.read(os.path.join(app.root_path, "config.ini"), encoding="utf-8")
-MODELSCOPE_KEY = os.environ.get("MODELSCOPE_KEY") or ""
+MODELSCOPE_KEY = os.environ.get("MODELSCOPE_KEY") or os.environ.get("MODELSCOPE_API_KEY") or ""
 MODELSCOPE_BASE_URL = os.environ.get("MODELSCOPE_BASE_URL") or _cfg.get("modelscope", "base_url", fallback="https://api-inference.modelscope.cn/v1")
 def _normalize_model_id(mid):
     try:
@@ -56,6 +56,13 @@ client = OpenAI(
     base_url=MODELSCOPE_BASE_URL,
     api_key=MODELSCOPE_KEY,
 )
+@app.route('/env_status', methods=['GET'])
+def env_status():
+    return jsonify({
+        "MODELSCOPE_KEY_present": bool(MODELSCOPE_KEY),
+        "MODELSCOPE_BASE_URL": MODELSCOPE_BASE_URL,
+        "MODEL_ID": MODEL_ID
+    })
 
 WORD_CARD_CACHE = {}
 ANALYSIS_CACHE = {}
