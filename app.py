@@ -24,6 +24,7 @@ app.config['UPLOAD_FOLDER'] = 'static/uploads'
 app.config['MAX_CONTENT_LENGTH'] = 32 * 1024 * 1024  # 32MB max
 app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 0
 app.config['TEMPLATES_AUTO_RELOAD'] = True
+app.config['JSON_AS_ASCII'] = False
 app.jinja_env.auto_reload = True
 
 # Ensure upload directory exists
@@ -34,7 +35,8 @@ os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 # ModelScope Configuration
 _cfg = configparser.ConfigParser()
 _cfg.read(os.path.join(app.root_path, "config.ini"), encoding="utf-8")
-MODELSCOPE_API_KEY = os.environ.get("MODELSCOPE_API_KEY") or _cfg.get("modelscope", "api_key", fallback="")
+# Support both MODELSCOPE_API_KEY (standard) and MODELSCOPE_KEY (doc alias)
+MODELSCOPE_API_KEY = os.environ.get("MODELSCOPE_API_KEY") or os.environ.get("MODELSCOPE_KEY") or _cfg.get("modelscope", "api_key", fallback="")
 MODELSCOPE_BASE_URL = os.environ.get("MODELSCOPE_BASE_URL") or _cfg.get("modelscope", "base_url", fallback="https://api-inference.modelscope.cn/v1")
 def _normalize_model_id(mid):
     try:
@@ -94,7 +96,7 @@ def _load_profile():
             return {
                 "nickname": "Alex",
                 "avatar": None,
-                "level": "Level 1 · Beginner",
+                "level": 1,
                 "growth_energy": 20,
                 "growth_goal": 100,
                 "voice": {
@@ -116,11 +118,70 @@ def _load_profile():
             }
         with open(PROFILE_STORE_PATH, "r", encoding="utf-8") as f:
             data = json.load(f)
-        if isinstance(data, dict):
-            return data
+            if isinstance(data, dict):
+                return data
     except Exception:
         pass
-    return {}
+    return {
+        "nickname": "Alex",
+        "avatar": None,
+        "level": 1,
+        "growth_energy": 0,
+        "growth_goal": 100,
+        "voice": {
+            "clone_enabled": False,
+            "rate": 0.95,
+            "pitch": 1.0,
+            "sample": None,
+            "model": "piper_zh"
+        },
+        "role_definition": "Supportive friend",
+        "learning_preference": {
+            "difficulty": "medium",
+            "target_level": "B1"
+        },
+        "notifications": True,
+        "privacy": {
+            "share_usage": False
+        }
+    }
+def _normalize_profile_numbers(profile: dict) -> dict:
+    try:
+        raw_level = profile.get("level", 1)
+        if isinstance(raw_level, int):
+            level_int = raw_level
+        else:
+            import re
+            m = re.search(r"\d+", str(raw_level))
+            level_int = int(m.group(0)) if m else 1
+        profile["level"] = level_int
+    except Exception:
+        profile["level"] = 1
+    # Normalize energy and goal
+    for key, default in [("growth_energy", 0), ("growth_goal", 100)]:
+        try:
+            val = profile.get(key, default)
+            profile[key] = int(val)
+        except Exception:
+            try:
+                import re
+                m = re.search(r"\d+", str(val))
+                profile[key] = int(m.group(0)) if m else default
+            except Exception:
+                profile[key] = default
+    return profile
+
+def _migrate_profile_store_once():
+    try:
+        prof = _load_profile()
+        norm = _normalize_profile_numbers(prof)
+        # Force save normalized profile to avoid legacy string types persisting
+        _save_profile(norm)
+    except Exception:
+        pass
+
+# Run a one-time migration at startup to ensure legacy profiles are normalized
+_migrate_profile_store_once()
 
 def _save_profile(profile):
     if not isinstance(profile, dict):
@@ -260,11 +321,18 @@ def _append_energy(user_id, action, delta):
         })
         with open(ENERGY_LOG_STORE_PATH, "w", encoding="utf-8") as f:
             json.dump(logs, f, ensure_ascii=False, indent=2)
-        profile = _load_profile()
+        profile = _normalize_profile_numbers(_load_profile())
         profile["growth_energy"] = int(profile.get("growth_energy", 0)) + int(delta)
+        # keep level_text simplified
+        profile["level_text"] = f"Level {int(profile.get('level', 1))}"
         _save_profile(profile)
     except Exception:
         pass
+
+COMPANION_CACHE = {
+    "text": "",
+    "expiry": 0
+}
 
 def _companion_state():
     energy_today = 0
@@ -274,20 +342,81 @@ def _companion_state():
             with open(ENERGY_LOG_STORE_PATH, "r", encoding="utf-8") as f:
                 logs = json.load(f)
         from datetime import timezone
-        today = date.today().isoformat()
+        today_iso = date.today().isoformat()
         for l in logs:
             ts = l.get("created_at","")
-            if ts[:10] == today:
+            if ts[:10] == today_iso:
                 energy_today += int(l.get("delta",0))
     except Exception:
         energy_today = 0
-    mood_tag = "supportive"
-    greeting = "Keep going! I’m here with you."
-    if energy_today >= 20:
-        greeting = "Amazing streak today! Let’s craft another sentence."
-    elif energy_today >= 10:
-        greeting = "Nice progress! One more moment to reach your goal."
-    return {"energy_today": energy_today, "mood_tag": mood_tag, "greeting": greeting}
+
+    global COMPANION_CACHE
+    now_ts = time.time()
+    
+    # Return cached greeting if valid
+    if now_ts < COMPANION_CACHE["expiry"] and COMPANION_CACHE["text"]:
+        return {
+            "energy_today": energy_today,
+            "mood_tag": "supportive",
+            "greeting": COMPANION_CACHE["text"]
+        }
+
+    # Generate new greeting via AI
+    try:
+        profile = _load_profile()
+        nickname = profile.get("nickname", "Friend")
+        # Ensure we get the CEFR level correctly
+        pref = profile.get("learning_preference", {})
+        if isinstance(pref, dict):
+            level = pref.get("target_level", "B1")
+        else:
+            level = "B1"
+            
+        now = datetime.now()
+        hour = now.hour
+        weekday = now.strftime("%A")
+        time_of_day = "morning"
+        if 12 <= hour < 18:
+            time_of_day = "afternoon"
+        elif hour >= 18:
+            time_of_day = "evening"
+            
+        # Get recent moment count
+        moments = _load_moments()
+        moments_today = [m for m in moments if m.get("date_key") == date.today().isoformat()]
+        moment_count = len(moments_today)
+        
+        prompt = f"""
+        You are a supportive language learning companion.
+        Context:
+        - User: {nickname} (Level {level})
+        - Time: {weekday} {time_of_day}
+        - Activity today: {moment_count} moments captured, {energy_today} energy points.
+        
+        Generate a short, natural, warm greeting (max 15 words) that fits this context.
+        If they haven't done much (0 moments), encourage them gently.
+        If they have done a lot, praise them.
+        Do NOT use quotes.
+        """
+        
+        response = _chat_completion_with_timeout(
+            model=TEXT_MODEL_ID,
+            messages=[{'role': 'user', 'content': prompt}],
+            timeout_s=10
+        )
+        greeting = response.choices[0].message.content.strip()
+        # Fallback if empty or error
+        if not greeting:
+            greeting = "Hello! Ready to capture some moments?"
+            
+        COMPANION_CACHE["text"] = greeting
+        COMPANION_CACHE["expiry"] = now_ts + 600  # Cache for 10 minutes
+        
+    except Exception as e:
+        print(f"Error generating greeting: {e}")
+        greeting = "Keep going! I’m here with you."
+        
+    return {"energy_today": energy_today, "mood_tag": "supportive", "greeting": greeting}
 
 @app.route('/companion/state')
 def companion_state():
@@ -364,7 +493,7 @@ def _heuristic_word_card(word, scene_hint):
         "degraded": True,
     }
 
-def _chat_completion_with_timeout(model, messages, timeout_s=20):
+def _chat_completion_with_timeout(model, messages, timeout_s=60):
     with concurrent.futures.ThreadPoolExecutor(max_workers=1) as ex:
         fut = ex.submit(client.chat.completions.create, model=model, messages=messages)
         return fut.result(timeout=timeout_s)
@@ -630,7 +759,7 @@ def _compute_tag_positions(analysis):
         positions[n["word"]] = {"left": round(n["x"] * 100, 2), "top": round(n["y"] * 100, 2)}
     return positions
 
-def analyze_image_with_ai(image_path):
+def analyze_image_with_ai(image_path, level="B1"):
     """
     Sends image to ModelScope Qwen-VL to get Nouns, Verbs, and Adjectives.
     """
@@ -641,19 +770,42 @@ def analyze_image_with_ai(image_path):
         with open(image_path, "rb") as image_file:
             encoded_string = base64.b64encode(image_file.read()).decode('utf-8')
         
-        prompt = """
-        You are an English learning assistant. Analyze this image and return ONLY a valid JSON object.
+        prompt = f"""
+        You are an expert linguistic AI assistant.
+        Analyze the image and generate vocabulary for a learner at CEFR Level {level}.
+
+        Return ONLY a JSON object. Do NOT include any "Step 1" text or brainstorming outside the JSON.
+
+        JSON Structure:
+        {{
+          "richness": 1-5,
+          "visual_objects": ["object1", "object2", "object3"], 
+          "learning_content": [
+            "Advanced Word 1 (Synonym)",
+            "Advanced Word 2 (Abstract)",
+            "Advanced Word 3 (Descriptive)",
+            "Idiomatic Phrase 1",
+            "Idiomatic Phrase 2",
+            "Complex Sentence Pattern 1"
+          ],
+          "scene_hint": "Short description of the scene",
+          "boxes": []
+        }}
 
         Requirements:
-        - richness: integer from 1 to 5 (how visually rich / how many distinct elements in the scene)
-        - nouns: 6-10 nouns (distinct objects visible)
-        - verbs: 4-8 verbs (actions happening or implied)
-        - adjectives: 4-8 adjectives (atmosphere or description)
-        - boxes: for as many nouns as possible, provide bounding boxes in normalized image coordinates:
-          [{"word": "tennis racket", "x": 0.10, "y": 0.20, "w": 0.30, "h": 0.40}]
-          where x,y are top-left, w,h are width/height, all in [0,1].
-
-        Return JSON with keys: "richness", "nouns", "verbs", "adjectives", "boxes".
+        1. "visual_objects": 
+           - Pick exactly 3-5 DISTINCT visible objects for tagging.
+           - Use simple, direct nouns (e.g. "book", "lamp", "hand").
+        
+        2. "learning_content":
+           - MUST contain EXACTLY 6 strings.
+           - The first 3 strings must be single advanced words (C1/C2 level) related to the image.
+           - The next 2 strings must be phrases.
+           - The last string must be a sentence pattern.
+           - If you cannot find C1 words, use B2 words.
+        
+        3. "boxes":
+           - Provide bounding boxes for "visual_objects" if possible.
         """
 
         messages_variants = [
@@ -692,7 +844,7 @@ def analyze_image_with_ai(image_path):
                 response = _chat_completion_with_timeout(
                     model=MULTIMODAL_MODEL_ID,
                     messages=msgs,
-                    timeout_s=20,
+                    timeout_s=60,
                 )
                 content = response.choices[0].message.content
                 content = content.replace("```json", "").replace("```", "").strip()
@@ -708,9 +860,22 @@ def analyze_image_with_ai(image_path):
                 parsed = None
         if parsed is None:
             raise last_err or RuntimeError("vision_response_invalid")
-        parsed["nouns"] = _normalize_words(parsed.get("nouns", []))
-        parsed["verbs"] = _normalize_words(parsed.get("verbs", []))
-        parsed["adjectives"] = _normalize_words(parsed.get("adjectives", []))
+        
+        # Normalize and map new keys to old keys for compatibility
+        # Handle visual_objects (for tags) vs core_words legacy
+        visual_objs = parsed.get("visual_objects") or parsed.get("core_words") or []
+        parsed["core_words"] = _normalize_words(visual_objs)
+        
+        # Handle learning_content (for chips) vs support_phrases legacy
+        learn_content = parsed.get("learning_content") or parsed.get("support_phrases") or []
+        parsed["support_phrases"] = learn_content
+        
+        # Compatibility mapping
+        parsed["visual_nouns"] = parsed["core_words"] 
+        parsed["nouns"] = parsed["core_words"]
+        parsed["verbs"] = []
+        parsed["adjectives"] = []
+        
         if not isinstance(parsed.get("boxes"), list):
             parsed["boxes"] = []
         return parsed
@@ -721,9 +886,13 @@ def analyze_image_with_ai(image_path):
             pass
         # Fallback data if AI fails
         return {
+            "richness": 3,
+            "core_words": ["moment", "photo", "day"],
+            "support_phrases": ["What a nice day!", "I see something cool.", "Capturing the moment."],
+            "scene_hint": "A nice moment",
             "nouns": ["moment", "photo", "day"],
-            "verbs": ["capturing", "seeing", "feeling"],
-            "adjectives": ["nice", "good", "memorable"]
+            "verbs": [],
+            "adjectives": []
         }
 
 def polish_text_with_ai(text):
@@ -741,9 +910,10 @@ def polish_text_with_ai(text):
         Return ONLY a valid JSON object with keys: "corrected", "better", "comment".
         """
         
-        response = client.chat.completions.create(
+        response = _chat_completion_with_timeout(
             model=TEXT_MODEL_ID,
             messages=[{'role': 'user', 'content': prompt}],
+            timeout_s=60
         )
         
         content = response.choices[0].message.content
@@ -771,32 +941,43 @@ def refine_text_with_ai(text):
         You are an English writing coach. The user wrote:
         {text}
 
-        Pick 3 to 5 highlights from the original text. For each highlight:
-        - original: an exact substring copied from the user's text (must appear verbatim)
-        - improved: a more natural version for that part
-        - explanation_cn: a short Chinese explanation of why it's better
-        - tone: one of ["native","advanced","casual","formal"]
+        Tasks:
+        1. Score the user's text from 0 to 100 based on CEFR Level {target_level}.
+        2. If score >= 90:
+           - Set "perfect": true.
+           - Provide a "perfect_msg" (e.g. "Amazing! This is perfect.").
+           - No need for "items".
+        3. If score < 90:
+           - Pick 3-5 highlights to improve.
+           - STRICTLY match CEFR Level {target_level} for improvements.
+           - For each highlight: original, improved, explanation_cn, tone.
+        4. Provide "emotional_feedback": A short, empathetic comment on the content (not the grammar). e.g. "That sounds like a lovely afternoon!"
+        5. Provide "ghost_words": 3 possible next words/phrases to continue the story.
 
-        Also provide:
-        - comment: one encouraging sentence in English for this diary entry.
-        Constraints:
-        - Tailor suggestions for difficulty={difficulty}, target_level={target_level}
-        - Role: {role}
-
-        Return ONLY valid JSON with keys: "comment", "items".
-        Example:
-        {{"comment":"...","items":[{{"original":"...","improved":"...","explanation_cn":"...","tone":"native"}}]}}
+        Return ONLY valid JSON with keys: "score", "perfect", "perfect_msg", "emotional_feedback", "ghost_words", "items".
+        Example item: {{"original":"...","improved":"...","explanation_cn":"...","tone":"native"}}
         """
 
-        response = client.chat.completions.create(
+        response = _chat_completion_with_timeout(
             model=TEXT_MODEL_ID,
             messages=[{'role': 'user', 'content': prompt}],
+            timeout_s=60
         )
         content = response.choices[0].message.content
         content = content.replace("```json", "").replace("```", "").strip()
         data = json.loads(content)
-        if not isinstance(data, dict):
-            raise ValueError("refine response not a JSON object")
+        
+        # Handle perfect score
+        if data.get("perfect"):
+            return {
+                "perfect": True,
+                "score": data.get("score"),
+                "comment": data.get("perfect_msg", "Perfect!"),
+                "emotional_feedback": data.get("emotional_feedback", ""),
+                "ghost_words": data.get("ghost_words", []),
+                "items": []
+            }
+
         items = data.get("items", [])
         if not isinstance(items, list):
             items = []
@@ -816,25 +997,19 @@ def refine_text_with_ai(text):
                 "explanation_cn": explanation_cn,
                 "tone": tone,
             })
-        return {"comment": str(data.get("comment", "")).strip() or "Nice moment!", "items": normalized_items[:5]}
+            
+        return {
+            "perfect": False,
+            "score": data.get("score", 0),
+            "comment": str(data.get("comment", "")).strip() or "Nice moment!",
+            "emotional_feedback": data.get("emotional_feedback", ""),
+            "ghost_words": data.get("ghost_words", []),
+            "items": normalized_items[:5]
+        }
     except Exception as e:
         print(f"Error refining text: {e}")
-        sentences = [s.strip() for s in re.split(r'(?<=[.!?])\s+', text) if s.strip()]
-        if not sentences:
-            sentences = [text]
-        items = []
-        for s in sentences[:3]:
-            improved = s
-            improved = re.sub(r'\bi very like\b', 'I really like', improved, flags=re.IGNORECASE)
-            improved = re.sub(r"\bi play tennis\b", "I'm playing tennis", improved, flags=re.IGNORECASE)
-            improved = improved[:1].upper() + improved[1:] if improved else improved
-            items.append({
-                "original": s,
-                "improved": improved,
-                "explanation_cn": "更自然、更符合英语表达习惯。",
-                "tone": "native",
-            })
-        return {"comment": "Looks like you had a great moment!", "items": items}
+        # ... fallback logic ...
+        return {"comment": "Looks like you had a great moment!", "items": []}
 
 def build_refine_parts(text, items):
     text = text or ""
@@ -952,9 +1127,14 @@ def upload_file():
             return redirect(url_for('camera'))
 
         _append_energy("anon", "upload", 5)
-        analysis = analyze_image_with_ai(filepath)
+        
+        profile = _load_profile()
+        pref = profile.get("learning_preference", {})
+        level = pref.get("target_level", "B1")
+        
+        analysis = analyze_image_with_ai(filepath, level=level)
         analysis["visual_nouns"] = _pick_visual_nouns(analysis)
-        analysis["scene_hint"] = _scene_hint_from_analysis(analysis)
+        analysis["scene_hint"] = str(analysis.get("scene_hint", ""))
         analysis["tag_positions"] = _compute_tag_positions(analysis)
         ANALYSIS_CACHE[filename] = analysis
 
@@ -990,20 +1170,21 @@ def _generate_word_card_with_ai(word, scene_hint):
     - phonetic_uk: string
     - pos: string (e.g. "n.", "v.", "adj.")
     - definition_cn: string (short Chinese definition line, may include multiple items separated by "；")
-    - examples_level_en: string
-    - examples_level_cn: string
-    - examples_scene_en: string
-    - examples_scene_cn: string
+    - examples_level_en: A natural sentence using the word, suitable for CEFR Level {target_level}.
+    - examples_level_cn: Chinese translation.
+    - examples_scene_en: A sentence using the word that describes the scene ({scene_hint}), suitable for CEFR Level {target_level}.
+    - examples_scene_cn: Chinese translation.
 
     Constraints:
     - Keep Chinese concise and natural.
     - Examples should be helpful for an intermediate learner.
+    - Strictly follow CEFR Level {target_level} for sentence complexity.
     """
 
     response = _chat_completion_with_timeout(
         model=TEXT_MODEL_ID,
         messages=[{'role': 'user', 'content': prompt}],
-        timeout_s=20,
+        timeout_s=60,
     )
     content = response.choices[0].message.content
     content = content.replace("```json", "").replace("```", "").strip()
@@ -1096,17 +1277,21 @@ def refine():
     if not recs:
         parts = [{"type": "text", "content": content}]
         knowledge = {}
-        recs = []
+        # recs = [] # Keep recs empty if perfect or no items
     _append_energy("anon", "refine", 5)
     return render_template(
         'refine.html',
         image=image,
         content=content,
-        date="January 31th, 2026",
+        date=datetime.now().strftime("%B %d, %Y"), # Fix static date
         comment=refine_data.get("comment", ""),
         parts=parts,
         knowledge=knowledge,
         recs=recs,
+        perfect=refine_data.get("perfect", False),
+        score=refine_data.get("score", 0),
+        emotional_feedback=refine_data.get("emotional_feedback", ""),
+        ghost_words=refine_data.get("ghost_words", []),
     )
 
 @app.route('/refine', methods=['GET'])
@@ -1170,7 +1355,10 @@ def momentsbook():
     for d in week_days:
         d["count"] = int(date_counts.get(d["date_key"], 0))
     # build month grids for browsing (previous month + current month)
-    months_view = _month_grid(anchor, months_back=2, months_forward=2, active_date_keys=active_dates, counts=date_counts)
+    # Correct anchor logic: Use Today as the anchor for month grid view, not the latest moment.
+    # This ensures the calendar always centers on or includes the current real-world month.
+    calendar_anchor = date.today()
+    months_view = _month_grid(calendar_anchor, months_back=2, months_forward=2, active_date_keys=active_dates, counts=date_counts)
 
     grouped = {}
     for m in moments:
@@ -1223,7 +1411,18 @@ def diary_by_date(date_key):
     moments.sort(key=lambda m: m.get("created_at", ""))
     first = moments[0]
     image = first.get("image")
-    content = "\n".join([str(m.get("content", "")).strip() for m in moments if m.get("content")]).strip()
+    
+    # Load existing diary content
+    diary_content_str = ""
+    diary_store_path = os.path.join(app.root_path, "diary_store.json")
+    if os.path.exists(diary_store_path):
+        try:
+            with open(diary_store_path, "r", encoding="utf-8") as f:
+                d_store = json.load(f)
+                diary_content_str = d_store.get(date_key, {}).get("content", "")
+        except:
+            pass
+
     try:
         d = datetime.strptime(date_key, "%Y-%m-%d")
         display_date = f"{d.strftime('%A')}, {d.strftime('%b')} {d.day}"
@@ -1248,10 +1447,9 @@ def diary_by_date(date_key):
     acts = []
     moods = []
     for m in moments:
-        parsed = _parse_scene_hint(m.get("scene_hint", ""))
-        objs.extend(parsed.get("objects", []))
-        acts.extend(parsed.get("actions", []))
-        moods.extend(parsed.get("mood", []))
+        if m.get("visual_nouns"): objs.extend(m["visual_nouns"])
+        if m.get("verbs"): acts.extend(m["verbs"])
+        if m.get("adjectives"): moods.extend(m["adjectives"])
     def uniq(xs):
         out = []
         seen = set()
@@ -1275,19 +1473,35 @@ def diary_by_date(date_key):
         if moods:
             parts.append(f"心情：{', '.join(moods)}")
         prompt_hint = "基于今日 " + "；".join(parts) + "，写一段小记吧。"
-    recs = []
-    base_obj = (objs[0] if objs else "")
-    for n in objs[:3]:
-        recs.append(f"I really like the {n}.")
-    for a in acts[:2]:
-        if base_obj:
-            recs.append(f"I was {a} near the {base_obj}.")
-        else:
-            recs.append(f"I was {a} today.")
-    for md in moods[:2]:
-        recs.append(f"It felt {md}.")
-    if not recs:
-        recs = ["Today was meaningful.", "I learned something new.", "I want to remember this moment."]
+    try:
+        # AI-generated prompts
+        moment_texts = [m.get("content", "") for m in moments]
+        moment_scenes = [m.get("scene_hint", "") for m in moments]
+        combined_context = "; ".join([t for t in moment_texts if t]) + " | " + "; ".join([s for s in moment_scenes if s])
+        
+        prompt = f"""
+        You are a reflective journaling companion.
+        User's day summary: {combined_context[:1000]}
+        
+        Generate 3 short, thought-provoking questions (in English) to help the user write their diary.
+        Questions should be specific to the day's events if possible, or general if not.
+        Return ONLY a valid JSON list of strings: ["Question 1?", "Question 2?", "Question 3?"]
+        """
+        
+        response = _chat_completion_with_timeout(
+            model=TEXT_MODEL_ID,
+            messages=[{'role': 'user', 'content': prompt}],
+            timeout_s=10
+        )
+        content_json_recs = response.choices[0].message.content.strip()
+        if "[" in content_json_recs and "]" in content_json_recs:
+            content_json_recs = content_json_recs[content_json_recs.find("["):content_json_recs.rfind("]")+1]
+        recs = json.loads(content_json_recs)
+        if not isinstance(recs, list):
+            recs = ["What was the highlight of your day?", "How did you feel?", "What did you learn?"]
+    except Exception as e:
+        print(f"Error generating diary prompts: {e}")
+        recs = ["What was the highlight of your day?", "How did you feel?", "What did you learn?"]
     brief_map = {}
     try:
         items = []
@@ -1297,8 +1511,8 @@ def diary_by_date(date_key):
             items.append({"id": m.get("id"), "scene": scene, "words": words})
         prompt = "Create one short, natural English sentence (<= 80 chars) per item, describing the moment casually.\nReturn ONLY JSON list: [{id:'', text:''}] for these items:\n" + json.dumps(items, ensure_ascii=False)
         resp = _chat_completion_with_timeout(model=TEXT_MODEL_ID, messages=[{'role':'user','content':prompt}], timeout_s=18)
-        content = resp.choices[0].message.content.strip().replace("```json","").replace("```","")
-        data = json.loads(content)
+        content_json = resp.choices[0].message.content.strip().replace("```json","").replace("```","")
+        data = json.loads(content_json)
         if isinstance(data, list):
             for it in data:
                 i = str(it.get("id","")).strip()
@@ -1321,12 +1535,32 @@ def diary_by_date(date_key):
             else:
                 brief = "A cozy little moment."
             brief_map[m.get("id")] = brief
+    
+    # Letter Logic
+    daily_letter = ""
+    try:
+        letters_path = os.path.join(app.root_path, "letters_store.json")
+        if os.path.exists(letters_path):
+            with open(letters_path, "r", encoding="utf-8") as f:
+                letters_data = json.load(f)
+                if date_key in letters_data:
+                    # Check 7:00 AM rule
+                    target_d = date.fromisoformat(date_key)
+                    viewable_dt = datetime.combine(target_d + timedelta(days=1), datetime.min.time().replace(hour=7))
+                    
+                    if datetime.now() >= viewable_dt:
+                        daily_letter = letters_data[date_key].get("content", "")
+                    else:
+                        daily_letter = "The spirit is writing... (Available tomorrow at 07:00)"
+    except Exception as e:
+        print(f"Error loading letter: {e}")
+
     _append_energy("anon", "open_daily_view", 1)
     return render_template(
         "diary.html",
         date=display_date,
         image=image,
-        content=content,
+        content=diary_content_str,
         date_key=date_key,
         moments=moments,
         prompt_hint=prompt_hint,
@@ -1334,6 +1568,7 @@ def diary_by_date(date_key):
         photos_count=len(moments),
         time_hint=time_hint,
         brief_map=brief_map,
+        daily_letter=daily_letter,
     )
 @app.route('/diary/letter/generate', methods=['POST'])
 def diary_letter_generate():
@@ -1352,7 +1587,41 @@ def diary_letter_generate():
 
 @app.route('/profile', methods=['GET'])
 def profile():
-    profile = _load_profile()
+    profile = _normalize_profile_numbers(_load_profile())
+    
+    # Auto-update level logic on page load to fix legacy data
+    changed = False
+    current_energy = int(profile.get("growth_energy", 0))
+    current_goal = int(profile.get("growth_goal", 100)) # Default to 100 for legacy compatibility
+    
+    # Ensure reasonable goal start
+    if current_goal < 100:
+        current_goal = 100
+        changed = True
+        
+    if current_energy >= current_goal:
+        # Robustly get current level
+        level_int = int(profile.get("level", 1))
+
+        while current_energy >= current_goal:
+            current_energy -= current_goal
+            level_int += 1
+            current_goal = int(current_goal * 1.2)
+            changed = True
+        
+        profile["level"] = level_int
+        profile["growth_energy"] = current_energy
+        profile["growth_goal"] = current_goal
+        
+    # Simplify level text as requested
+    new_level_text = f"Level {int(profile.get('level', 1))}"
+    if profile.get("level_text") != new_level_text:
+        profile["level_text"] = new_level_text
+        changed = True
+        
+    if changed:
+        _save_profile(profile)
+
     # collect word bank overview
     store = _load_word_cards_store()
     word_bank_count = len(store)
@@ -1360,7 +1629,7 @@ def profile():
 
 @app.route('/profile_update', methods=['POST'])
 def profile_update():
-    profile = _load_profile()
+    profile = _normalize_profile_numbers(_load_profile())
     data = request.json or {}
     for k in ["nickname", "level", "role_definition"]:
         if k in data:
@@ -1370,6 +1639,32 @@ def profile_update():
             profile["growth_energy"] = int(data["growth_energy"])
         except Exception:
             pass
+            
+    # Check for level up logic
+    leveled_up = False
+    current_energy = int(profile.get("growth_energy", 0))
+    current_goal = int(profile.get("growth_goal", 100))
+    
+    # Simple level up scheme: if energy exceeds goal
+    if current_energy >= current_goal:
+        # Robustly get current level
+        level_int = int(profile.get("level", 1))
+
+        # Calculate how many levels gained (in case of massive energy gain)
+        while current_energy >= current_goal:
+            current_energy -= current_goal
+            level_int += 1
+            # Increase goal by 20% each level
+            current_goal = int(current_goal * 1.2)
+            leveled_up = True
+            
+        profile["level"] = level_int
+        profile["growth_energy"] = current_energy
+        profile["growth_goal"] = current_goal
+        
+        # Simplify level text
+        profile["level_text"] = f"Level {int(profile.get('level', 1))}"
+
     if "learning_preference" in data and isinstance(data["learning_preference"], dict):
         lp = profile.get("learning_preference", {})
         lp.update(data["learning_preference"])
@@ -1385,7 +1680,7 @@ def profile_update():
         vc.update(data["voice"])
         profile["voice"] = vc
     _save_profile(profile)
-    return jsonify({"ok": True, "profile": profile})
+    return jsonify({"ok": True, "profile": profile, "level_up": leveled_up})
 
 @app.route('/voice_packs', methods=['GET'])
 def voice_packs():
@@ -1474,5 +1769,85 @@ def assessment_submit():
     _append_energy("anon", "assessment", 5)
     return jsonify({"ok": True, "raw_score": raw_score, "ce_fr_level": ce_fr_level, "estimated_vocab": estimated_vocab})
 
+def _generate_daily_letter_if_needed(target_date_iso):
+    letters_path = os.path.join(app.root_path, "letters_store.json")
+    letters = {}
+    if os.path.exists(letters_path):
+        try:
+            with open(letters_path, "r", encoding="utf-8") as f:
+                letters = json.load(f)
+        except:
+            letters = {}
+            
+    if target_date_iso in letters:
+        return
+        
+    # Get moments for that date
+    moments = _load_moments()
+    day_moments = [m for m in moments if m.get("date_key") == target_date_iso]
+    if not day_moments:
+        return
+
+    # Generate
+    try:
+        profile = _load_profile()
+        role = str(profile.get("role_definition","")).strip()
+        nickname = profile.get("nickname", "Friend")
+        pref = profile.get("learning_preference", {})
+        level = pref.get("target_level", "B1")
+        
+        content_summary = "\n".join([f"- {m.get('content','')} ({m.get('scene_hint','')})" for m in day_moments])
+        
+        prompt = f"""
+        You are {role if role else 'a supportive companion'}.
+        Write a warm, encouraging letter to {nickname} (Level {level}) about their day ({target_date_iso}).
+        
+        Moments from the day:
+        {content_summary}
+        
+        Requirements:
+        - Reflect on their moments.
+        - Be supportive and empathetic.
+        - Use simple, warm English suitable for Level {level}.
+        - Length: around 100-150 words.
+        """
+        
+        response = _chat_completion_with_timeout(
+            model=TEXT_MODEL_ID,
+            messages=[{'role': 'user', 'content': prompt}],
+            timeout_s=60
+        )
+        letter_content = response.choices[0].message.content.strip()
+        
+        letters[target_date_iso] = {
+            "content": letter_content,
+            "created_at": datetime.now().isoformat()
+        }
+        
+        with open(letters_path, "w", encoding="utf-8") as f:
+            json.dump(letters, f, ensure_ascii=False, indent=2)
+            
+    except Exception as e:
+        print(f"Error generating daily letter: {e}")
+
+def background_scheduler():
+    while True:
+        try:
+            now = datetime.now()
+            # Run at 00:00 - 00:05
+            if now.hour == 0 and now.minute < 5:
+                yesterday = (now - timedelta(days=1)).date().isoformat()
+                _generate_daily_letter_if_needed(yesterday)
+            time.sleep(60)
+        except Exception as e:
+            print(f"Scheduler error: {e}")
+            time.sleep(60)
+
 if __name__ == '__main__':
+    if not os.path.exists(app.config['UPLOAD_FOLDER']):
+        os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+    
+    # Start scheduler
+    threading.Thread(target=background_scheduler, daemon=True).start()
+    
     app.run(host='0.0.0.0', port=7860, debug=True, use_reloader=False)
