@@ -502,7 +502,15 @@ def _heuristic_word_card(word, scene_hint):
 def _chat_completion_with_timeout(model, messages, timeout_s=20):
     with concurrent.futures.ThreadPoolExecutor(max_workers=1) as ex:
         fut = ex.submit(client.chat.completions.create, model=model, messages=messages)
-        return fut.result(timeout=timeout_s)
+        try:
+            return fut.result(timeout=timeout_s)
+        except Exception:
+            # Fallback to responses.create for compatibility
+            def _resp():
+                txt = "\n".join([m.get("content","") for m in messages if m.get("role")=="user"])
+                return client.responses.create(model=model, input=txt)
+            fut2 = ex.submit(_resp)
+            return fut2.result(timeout=timeout_s)
 
 def _load_moments():
     try:
