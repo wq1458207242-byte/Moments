@@ -1,0 +1,50 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<div class="wordbank-page">
+    <div class="profile-header">
+        <a href="{{ url_for('main.profile') }}" class="back-btn" style="text-decoration:none;">←</a>
+        <div class="profile-title">Word Bank</div>
+    </div>
+
+    <div style="display:flex; gap:10px; margin-bottom:10px;">
+        <input id="wbSearch" placeholder="Search word or scene..." style="flex:1; border:1px solid #eee; border-radius:10px; padding:8px;">
+        <select id="wbFavFilter" style="border:1px solid #eee; border-radius:10px; padding:8px;">
+            <option value="all">All</option>
+            <option value="fav">Favorites</option>
+        </select>
+    </div>
+    <div class="wb-list" id="wbList">
+        {% for item in items %}
+        <div class="wb-card" data-word="{{ item.word }}" data-def="{{ item.data.definition_cn }}" data-fav="{{ '1' if item.data.favorite else '0' }}">
+            <div class="wb-word">{{ item.word }}</div>
+            <div class="wb-def">{{ item.data.definition_cn }}</div>
+            <div class="wb-ex">
+                <div class="wb-line">{{ item.data.examples_level_en }}</div>
+                <div class="wb-line-cn">{{ item.data.examples_level_cn }}</div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    <script>
+        const list = document.getElementById('wbList');
+        const q = document.getElementById('wbSearch');
+        const fav = document.getElementById('wbFavFilter');
+        function applyFilter(){
+            const qs = (q.value||'').toLowerCase();
+            const fv = fav.value;
+            list.querySelectorAll('.wb-card').forEach(el=>{
+                const w = (el.getAttribute('data-word')||'').toLowerCase();
+                const d = (el.getAttribute('data-def')||'').toLowerCase();
+                const isFav = el.getAttribute('data-fav') === '1';
+                const matches = (!qs || w.includes(qs) || d.includes(qs));
+                const favOk = (fv==='all') || (fv==='fav' && isFav);
+                el.style.display = (matches && favOk) ? '' : 'none';
+            });
+        }
+        q.addEventListener('input', applyFilter);
+        fav.addEventListener('change', applyFilter);
+        applyFilter();
+    </script>
+</div>
+{% endblock %}

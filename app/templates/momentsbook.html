@@ -1,0 +1,990 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<div class="phone-frame momentsbook">
+    <div class="mb-header">
+        <div class="mb-nav-bar">
+            <a class="mb-back-btn" href="{{ url_for('main.index') }}" style="text-decoration:none;">
+                <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 8 8 12 12 16"></polyline><line x1="16" y1="12" x2="8" y2="12"></line></svg>
+            </a>
+            <div class="mb-month-title">{{ month_title }}</div>
+            <div class="mb-week-strip">
+                {% for d in week_days %}
+                    <div class="mb-cal-day {% if d.active %}active{% endif %}" data-date-key="{{ d.date_key }}">
+                        <div class="mb-day-box {% if d.active %}active{% endif %}">
+                            <div class="mb-dow">{{ d.dow }}</div>
+                            <div class="mb-date">{{ d.day }}</div>
+                            <div class="mb-count-badge {% if (d.count|default(0))>0 %}has{% endif %}">{{ d.count|default(0) }}</div>
+                            <div class="mb-height-bar" style="height: {{ 12 + ((d.count|default(0)) * 6) }}px;"></div>
+                        </div>
+                    </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    {% if months_view %}
+    <div class="mb-month-grid collapsed" id="mbMonthGrid">
+        <div class="mb-month-slider" id="mbMonthSlider">
+            {% for m in months_view %}
+            <div class="mb-month-panel" data-mi="{{ loop.index0 }}">
+                <div class="mb-month-head">{{ m.month_title }} {{ m.year }}</div>
+                <div class="mb-month-weeks">
+                    {% for w in m.weeks %}
+                        {% for cell in w %}
+                            {% if cell %}
+                                <div class="mb-month-cell {% if cell.active %}active{% endif %}" data-date-key="{{ cell.date_key }}">
+                                    <span class="num">{{ cell.day }}</span>
+                                    {% if (cell.count|default(0))>0 %}<div class="mini-badge">{{ cell.count|default(0) }}</div>{% endif %}
+                                </div>
+                            {% else %}
+                                <div class="mb-month-cell inactive"></div>
+                            {% endif %}
+                        {% endfor %}
+                    {% endfor %}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    <div class="mb-timeline-scroll">
+        {% for day in day_sections %}
+            <div class="mb-day-section" id="day-{{ day.date_key }}">
+                <div class="mb-date-header">
+                    <div class="mb-date-text {% if day.accent == 'dark' %}dark{% endif %}">
+                        {{ day.display_date }} <span>{{ day.year }}</span>
+                    </div>
+                    <a class="mb-open-btn {% if day.accent == 'dark' %}dark{% endif %}" href="{{ url_for('diary.diary_by_date', date_key=day.date_key) }}" style="text-decoration:none;">
+                        Open
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><line x1="9" y1="3" x2="9" y2="21"></line></svg>
+                    </a>
+                </div>
+
+                <div class="mb-card-carousel">
+                    {% for m in day.moments %}
+                        <div class="mb-moment-card" style="background-image: url('{{ url_for('static', filename='uploads/' + m.image) }}');" data-moment-id="{{ m.id }}">
+                            <div class="mb-moment-badge">Moment #{{ loop.index }}</div>
+                            {% if loop.index == 1 %}
+                                <div class="mb-date-stamp">{{ day.display_date }}</div>
+                            {% endif %}
+                            {% for w in (m.words or []) %}
+                                {% set pos = (loop.index0 % 3) + 1 %}
+                                <div class="mb-tag pos-{{ pos }}" data-word="{{ w }}" data-scene="{{ m.scene_hint }}">
+                                    <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/></svg>
+                                    {{ w }}
+                                </div>
+                            {% endfor %}
+                        </div>
+                    {% endfor %}
+                </div>
+            </div>
+        {% endfor %}
+    </div>
+
+    <div class="modal-overlay" id="mbModal">
+        <div class="modal-card" id="mbModalCard">
+            <div id="mbModalContent"></div>
+        </div>
+    </div>
+
+    <!-- Improved Delete Zone -->
+    <div id="mbDeleteZone" class="mb-delete-zone">
+        <div class="mb-delete-icon">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+        </div>
+        <span class="mb-delete-text">Release to Delete</span>
+    </div>
+
+    <style>
+        .mb-nav-bar { display:flex; align-items:center; justify-content:space-between; padding: 10px 14px; }
+        .mb-month-title { font-weight: 700; cursor: pointer; }
+        .mb-month-title:active { opacity: 0.7; }
+        .mb-week-strip {
+            position: relative;
+            overflow-x: auto;
+            overflow-y: hidden;
+            white-space: nowrap;
+            display: flex;
+            gap: 6px;
+            align-items: flex-end;
+            padding: 4px 6px;
+            min-height: 60px;
+            scroll-behavior: smooth;
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+        .mb-week-strip::-webkit-scrollbar { display: none; }
+        /* Removed .mb-week-inner since we are reverting to simple scroll */
+        .mb-cal-day { flex: 0 0 auto; }
+        .mb-cal-day { display:flex; align-items:flex-end; cursor: pointer; }
+        .mb-day-box {
+            position: relative;
+            width: 36px;
+            height: 52px;
+            border-radius: 10px;
+            background: #f5f7fa;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+            box-shadow: inset 0 -8px 0 rgba(0,0,0,0.03);
+            transition: transform .2s ease, background .2s ease, box-shadow .2s ease;
+        }
+        .mb-day-box.active {
+            background: #fff4e6;
+            box-shadow: inset 0 -8px 0 rgba(255, 163, 72, .25);
+        }
+        .mb-dow { font-size: 9px; color: #8ca0b3; margin-top: 4px; }
+        .mb-date { font-size: 12px; font-weight: 700; color: #1f3045; line-height: 16px; }
+        .mb-count-badge {
+            position: absolute;
+            right: -5px;
+            top: -5px;
+            min-width: 16px;
+            padding: 0 4px;
+            height: 16px;
+            border-radius: 8px;
+            background: #e6edf5;
+            color: #3c597a;
+            font-size: 10px;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            opacity: 0.0;
+            transform: scale(0.9);
+            transition: opacity .2s ease, transform .2s ease;
+        }
+        .mb-count-badge.has {
+            opacity: 1.0;
+            transform: scale(1);
+        }
+        .mb-height-bar {
+            position: absolute;
+            bottom: -6px;
+            width: 16px;
+            border-radius: 10px;
+            background: linear-gradient(180deg, rgba(53, 161, 255, .45), rgba(53, 161, 255, .15));
+        }
+        /* Monthly grid styles */
+        .mb-month-grid { margin: 8px 14px 14px; padding: 12px; border-radius: 16px; background:#f6f8fb; transition: max-height .35s cubic-bezier(0.19,1,0.22,1), opacity .25s ease, transform .25s ease; overflow: hidden; transform-origin: top; }
+        .mb-month-head { display:flex; align-items:center; gap:8px; font-weight:700; color:#3a506b; margin-bottom:8px; }
+        .mb-month-weeks { display:grid; grid-template-columns: repeat(7, 1fr); gap:6px; }
+        .mb-month-cell {
+            height: 48px; border-radius:10px; background:#fff; display:flex; align-items:center; justify-content:center; position:relative;
+            box-shadow: 0 1px 0 rgba(0,0,0,0.03);
+            cursor: pointer;
+        }
+        .mb-month-cell .num { font-weight:700; color:#1f3045; }
+        .mb-month-cell .mini-badge {
+            position:absolute; right:6px; top:6px; min-width:16px; padding:0 4px; height:16px; border-radius:8px;
+            background:#e8f0fe; color:#3c597a; font-size:10px; display:flex; align-items:center; justify-content:center;
+        }
+        .mb-month-cell.inactive { background: #f0f4f9; color: #a6b7c8; }
+        .mb-month-cell.active { outline: 2px solid rgba(255, 163, 72, .35); background:#fffaf2; }
+        .mb-month-grid.collapsed { max-height: 0; opacity: 0; transform: translateY(-6px); margin-top: 0; margin-bottom: 0; }
+        .mb-month-grid.expanded { opacity: 1; transform: translateY(0); }
+        .mb-month-slider { display:flex; width:100%; transition: transform .25s ease; will-change: transform; }
+        .mb-month-panel { min-width:100%; width:100%; }
+        .mb-delete-zone {
+            position: fixed;
+            bottom: 40px;
+            left: 50%;
+            transform: translateX(-50%) translateY(150%);
+            width: 90%;
+            max-width: 360px;
+            height: 80px;
+            background: rgba(30, 30, 30, 0.95);
+            backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            border-radius: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            color: rgba(255, 255, 255, 0.95);
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+            transition: transform 0.3s cubic-bezier(0.19, 1, 0.22, 1), background 0.3s, width 0.3s, box-shadow 0.3s;
+            z-index: 20000; /* High but below ghost */
+            font-size: 16px;
+            font-weight: 600;
+            opacity: 0;
+            pointer-events: none; /* Let clicks pass through when hidden */
+        }
+        .mb-delete-zone.active {
+            transform: translateX(-50%) translateY(0);
+            opacity: 1;
+            pointer-events: auto;
+        }
+        .mb-delete-zone.highlight {
+            background: #ff3b30;
+            transform: translateX(-50%) scale(1.02);
+            box-shadow: 0 15px 50px rgba(255, 59, 48, 0.5);
+            border-color: #ff3b30;
+        }
+        .mb-delete-zone .mb-delete-icon {
+            display: flex;
+            align-items: center;
+        }
+        .mb-moment-card.deleting {
+            transition: transform 0.4s ease, opacity 0.4s ease;
+            transform: scale(0.1) rotate(10deg) !important;
+            opacity: 0;
+        }
+        /* Ghost styling improvements */
+        .mb-moment-card.ghost {
+            box-shadow: 0 20px 50px rgba(0,0,0,0.4);
+            border: 2px solid rgba(255,255,255,0.4);
+            pointer-events: none;
+        }
+    </style>
+</div>
+
+<script>
+    let __cardDragging = false;
+    const modal = document.getElementById('mbModal');
+    const modalCard = document.getElementById('mbModalCard');
+    const modalContent = document.getElementById('mbModalContent');
+    const dropZone = document.getElementById('mbDeleteZone');
+
+    function wrapDiff(diff, n) {
+        if (n <= 0) return diff;
+        const half = n / 2;
+        let d = ((diff % n) + n) % n;
+        if (d > half) d -= n;
+        if (Number.isInteger(half) && Math.abs(d) === half) {
+            d = diff < 0 ? -half : half;
+        }
+        return d;
+    }
+
+    function setupStackCarousel(carouselEl) {
+        let cards = [];
+        let n = 0;
+        let active = 0;
+        let activeFloat = 0;
+        let pointerId = null;
+        let dragging = false;
+        let startX = 0;
+        let startY = 0;
+        let lastX = 0;
+        let lastY = 0;
+
+        function refreshCards() {
+            cards = Array.from(carouselEl.querySelectorAll('.mb-moment-card'));
+            n = cards.length;
+            cards.forEach((c, i) => c.dataset.i = String(i));
+            // Always reset activeFloat to a valid integer index to avoid fractional drift
+            if (n === 0) {
+                active = 0;
+                activeFloat = 0;
+                return;
+            }
+            // Clamp active within [0, n-1]
+            active = Math.max(0, Math.min(active, n - 1));
+            activeFloat = active;
+            applyTransforms();
+        }
+        // expose a hook so external deletion logic can notify index changes
+        carouselEl.__mbRefresh = refreshCards;
+        carouselEl.__mbOnDelete = function(deletedIndex) {
+            try {
+                const di = Number.isFinite(deletedIndex) ? deletedIndex : parseInt(String(deletedIndex || 0), 10);
+                if (!isNaN(di) && di <= active) {
+                    active = Math.max(0, active - 1);
+                    activeFloat = active;
+                }
+            } catch (_) {}
+            refreshCards();
+        };
+
+        function applyTransforms() {
+            const maxVisible = Math.min(4, Math.max(2, n - 1));
+            for (let i = 0; i < n; i++) {
+                const c = cards[i];
+                const d = wrapDiff(i - activeFloat, n);
+                const absd = Math.abs(d);
+                const visible = absd <= maxVisible;
+                if (!visible) {
+                    c.classList.remove('is-visible');
+                    c.classList.remove('is-active');
+                    continue;
+                }
+                c.classList.add('is-visible');
+                if (absd < 0.45) c.classList.add('is-active');
+                else c.classList.remove('is-active');
+                const dir = d === 0 ? 0 : (d > 0 ? 1 : -1);
+                const tx = d * 64;
+                const ty = absd * 6;
+                const rotZ = dir * Math.min(10, 4 + absd * 2.2);
+                const rotY = -dir * Math.min(14, absd * 6);
+                const scale = 1 - Math.min(0.12, absd * 0.045);
+                const bright = 1 - Math.min(0.28, absd * 0.10);
+                const blur = Math.min(3, absd * 0.9);
+                const z = 100 - Math.round(absd * 10);
+                c.style.zIndex = String(z);
+                c.style.filter = `brightness(${bright}) blur(${blur}px)`;
+                c.style.transform = `translateX(calc(-50% + ${tx}px)) translateY(${ty}px) rotateY(${rotY}deg) rotateZ(${rotZ}deg) scale(${scale})`;
+            }
+        }
+
+        function snapToIndex(idx) {
+            active = ((idx % n) + n) % n;
+            activeFloat = active;
+            applyTransforms();
+        }
+
+        refreshCards();
+
+        // Auto-recompute when cards are added/removed
+        const mo = new MutationObserver(() => {
+            refreshCards();
+        });
+        mo.observe(carouselEl, { childList: true });
+
+        carouselEl.addEventListener('pointerdown', (e) => {
+            if (__cardDragging) return;
+            if (e.button !== 0) return;
+            if (e.target && e.target.closest('.mb-tag')) return;
+            pointerId = e.pointerId;
+            dragging = false;
+            startX = e.clientX;
+            startY = e.clientY;
+            lastX = startX;
+            lastY = startY;
+            carouselEl.setPointerCapture(pointerId);
+        });
+
+        carouselEl.addEventListener('pointermove', (e) => {
+            if (__cardDragging) return;
+            if (pointerId === null || e.pointerId !== pointerId) return;
+            if (n <= 0) return;
+            lastX = e.clientX;
+            lastY = e.clientY;
+            const dx = lastX - startX;
+            const dy = lastY - startY;
+            if (!dragging) {
+                if (Math.abs(dx) < 8) return;
+                if (Math.abs(dx) < Math.abs(dy) * 1.2) return;
+                dragging = true;
+                carouselEl.classList.add('dragging');
+            }
+            e.preventDefault();
+            const progress = dx / 240;
+            activeFloat = active - progress;
+            applyTransforms();
+        });
+
+        function endDrag() {
+            if (__cardDragging) return;
+            if (pointerId === null) return;
+            try { carouselEl.releasePointerCapture(pointerId); } catch (e) {}
+            const dx = lastX - startX;
+            carouselEl.classList.remove('dragging');
+            pointerId = null;
+            if (!dragging || n <= 1) {
+                dragging = false;
+                snapToIndex(active);
+                return;
+            }
+            const shift = Math.max(-3, Math.min(3, Math.round(-dx / 200)));
+            dragging = false;
+            if (shift !== 0) snapToIndex(active + shift);
+            else snapToIndex(active);
+        }
+
+        carouselEl.addEventListener('pointerup', endDrag);
+        carouselEl.addEventListener('pointercancel', endDrag);
+        carouselEl.addEventListener('pointerleave', (e) => {
+            if (pointerId !== null && e.pointerId === pointerId) endDrag();
+        });
+    }
+
+    function renderWordCard(data, fallbackWord) {
+        const word = data.word || fallbackWord || '';
+        modalContent.innerHTML = `
+            <div class="modal-top-action">✕</div>
+            <div class="word-card-header">
+                <h2 class="wc-title">${word}</h2>
+                <div style="display:flex; gap:12px; align-items:center;">
+                    <div class="heart-icon" id="heartBtn">♡</div>
+                    <div class="heart-icon" id="speakBtn">🔊</div>
+                </div>
+            </div>
+            <div class="wc-phonetic"></div>
+            <div class="wc-definition"></div>
+            <div class="wc-section-title">Example</div>
+            <div class="wc-example-en"></div>
+            <div class="wc-example-cn"></div>
+            <div class="wc-section-title">Using in this scenario</div>
+            <div class="wc-example-scene"></div>
+            <div class="wc-example-scene-cn"></div>
+        `;
+
+        const phoneticEl = modalContent.querySelector('.wc-phonetic');
+        const defEl = modalContent.querySelector('.wc-definition');
+        const lvlEnEl = modalContent.querySelector('.wc-example-en');
+        const lvlCnEl = modalContent.querySelector('.wc-example-cn');
+        const sceneEnEl = modalContent.querySelector('.wc-example-scene');
+        const sceneCnEl = modalContent.querySelector('.wc-example-scene-cn');
+
+        if (phoneticEl) {
+            const us = data.phonetic_us ? `美: ${data.phonetic_us}` : '';
+            const uk = data.phonetic_uk ? `英: ${data.phonetic_uk}` : '';
+            phoneticEl.textContent = [us, uk].filter(Boolean).join('  ') || '';
+        }
+        if (defEl) {
+            const pos = data.pos ? `${data.pos} ` : '';
+            defEl.innerHTML = `<b>${pos}${data.definition_cn || ''}</b>`;
+        }
+        if (lvlEnEl) lvlEnEl.textContent = data.examples_level_en || '';
+        if (lvlCnEl) lvlCnEl.textContent = data.examples_level_cn || '';
+        if (sceneEnEl) sceneEnEl.textContent = data.examples_scene_en || '';
+        if (sceneCnEl) sceneCnEl.textContent = data.examples_scene_cn || '';
+
+        const heart = modalContent.querySelector('#heartBtn');
+        if (heart) {
+            heart.addEventListener('click', (ev) => {
+                ev.stopPropagation();
+                heart.textContent = heart.textContent === '♡' ? '♥' : '♡';
+            });
+        }
+        const speak = (txt) => {
+            try {
+                if (window.speakWithProfile) {
+                    window.speakWithProfile(txt);
+                } else {
+                    const utter = new SpeechSynthesisUtterance(txt);
+                    window.speechSynthesis.cancel();
+                    window.speechSynthesis.speak(utter);
+                }
+            } catch(e) {}
+        };
+        const speakBtn = modalContent.querySelector('#speakBtn');
+        if (speakBtn) {
+            speakBtn.addEventListener('click', (ev) => {
+                ev.stopPropagation();
+                const def = (defEl && defEl.textContent) ? defEl.textContent : '';
+                const ex1 = (lvlEnEl && lvlEnEl.textContent) ? lvlEnEl.textContent : '';
+                speak(`${word}. ${def}. ${ex1}`);
+            });
+        }
+        const closeBtn = modalContent.querySelector('.modal-top-action');
+        if (closeBtn) closeBtn.addEventListener('click', () => modal.classList.remove('active'));
+    }
+
+    document.querySelectorAll('.mb-tag').forEach(tag => {
+        tag.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const word = tag.getAttribute('data-word');
+            const scene = tag.getAttribute('data-scene') || '';
+            modal.classList.add('active');
+            modalContent.innerHTML = `<div class="modal-top-action">✕</div><div style="padding:24px;">Loading...</div>`;
+            const url = `/api/word_card?word=${encodeURIComponent(word)}&scene=${encodeURIComponent(scene)}`;
+            const load = () => {
+                modalContent.innerHTML = `<div class="modal-top-action">✕</div><div style="padding:24px;">Loading...</div>`;
+                fetch(url)
+                    .then(async res => {
+                        if (!res.ok) {
+                            const err = await res.json().catch(() => ({}));
+                            throw new Error(err.message || 'AI 生成失败，请重试');
+                        }
+                        return res.json();
+                    })
+                    .then(data => renderWordCard(data, word))
+                    .catch((err) => {
+                        modalContent.innerHTML = `
+                            <div class="modal-top-action">✕</div>
+                            <div style="padding:24px;">
+                                <div style="font-weight:700; font-size:18px; margin-bottom:10px;">${word}</div>
+                                <div style="color:#666; margin-bottom:18px;">${(err && err.message) ? err.message : 'AI 生成失败，请重试'}</div>
+                                <button class="save-btn" id="retryWordCard" style="width: 100%;">Retry</button>
+                            </div>
+                        `;
+                        const retryBtn = document.getElementById('retryWordCard');
+                        if (retryBtn) retryBtn.addEventListener('click', (ev) => {
+                            ev.stopPropagation();
+                            load();
+                        });
+                    });
+            };
+            load();
+        });
+    });
+
+    modal.addEventListener('click', (e) => {
+        if (e.target === modal) modal.classList.remove('active');
+    });
+    modalCard.addEventListener('click', (e) => e.stopPropagation());
+
+    window.addEventListener('load', () => {
+        document.querySelectorAll('.mb-card-carousel').forEach(setupStackCarousel);
+        // click week strip jumps to day section
+        document.querySelectorAll('.mb-cal-day').forEach(el => {
+            const dk = el.getAttribute('data-date-key');
+            el.addEventListener('click', () => {
+                const target = dk ? document.getElementById('day-' + dk) : null;
+                if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                slideWeekTo(dk);
+            });
+        });
+        const monthTitle = document.querySelector('.mb-month-title');
+        const monthGridEl = document.getElementById('mbMonthGrid');
+        const monthSliderEl = document.getElementById('mbMonthSlider');
+            const weekStripEl = document.querySelector('.mb-week-strip');
+        let monthIndex = 0;
+        let monthExpanded = false;
+        function applyMonth(state) {
+            if (!monthGridEl) return;
+            monthExpanded = state;
+            if (monthExpanded) {
+                monthGridEl.classList.remove('collapsed');
+                monthGridEl.classList.add('expanded');
+                const h = monthGridEl.scrollHeight;
+                monthGridEl.style.maxHeight = h + 'px';
+                monthGridEl.style.opacity = '1';
+                monthGridEl.style.transform = 'translateY(0)';
+                // Ensure slider is at current month view when expanded
+                if (monthSliderEl) {
+                    const panels = Array.from(monthSliderEl.querySelectorAll('.mb-month-panel'));
+                    // Assuming last panel is current month as per loop order (oldest to newest usually, or check server logic)
+                    // Server logic: for m in months_view. usually index 0 is oldest? or newest?
+                    // Let's assume we want to show the last one (current month).
+                    // monthIndex was initialized to panels.length - 1 below.
+                    // We just need to make sure transform is applied.
+                    monthSliderEl.style.transform = 'translateX(' + (-monthIndex * 100) + '%)';
+                }
+            } else {
+                const h = monthGridEl.scrollHeight;
+                monthGridEl.style.maxHeight = h + 'px';
+                monthGridEl.offsetHeight;
+                monthGridEl.classList.add('collapsed');
+                monthGridEl.classList.remove('expanded');
+                monthGridEl.style.maxHeight = '0px';
+                monthGridEl.style.opacity = '0';
+                monthGridEl.style.transform = 'translateY(-6px)';
+            }
+        }
+        applyMonth(false);
+        if (monthTitle) monthTitle.addEventListener('click', () => applyMonth(!monthExpanded));
+        
+        // Week strip: direct rendering without complex animation wrapper
+        function parseDateKey(dk) {
+            try {
+                const [y, m, d] = dk.split('-').map(x => parseInt(x, 10));
+                return new Date(y, m - 1, d);
+            } catch (_) { return null; }
+        }
+        function formatDateKey(dateObj) {
+            const y = dateObj.getFullYear();
+            const m = String(dateObj.getMonth() + 1).padStart(2, '0');
+            const d = String(dateObj.getDate()).padStart(2, '0');
+            return `${y}-${m}-${d}`;
+        }
+        function dowShort(dateObj) {
+            return dateObj.toLocaleString('en-US', { weekday: 'short' }).toUpperCase();
+        }
+        function buildWeekAround(dateObj) {
+            const days = [];
+            // build a 7-day window centered on dateObj (3 before, target, 3 after)
+            for (let i = -3; i <= 3; i++) {
+                const d = new Date(dateObj);
+                d.setDate(dateObj.getDate() + i);
+                days.push({ dk: formatDateKey(d), dow: dowShort(d), day: d.getDate() });
+            }
+            return days;
+        }
+        
+        // Remove animation wrapper logic and use simple update
+        function updateWeekStrip(centerDateKey) {
+            if (!weekStripEl || !centerDateKey) return;
+            // Simply re-render content
+            const center = parseDateKey(centerDateKey);
+            const days = buildWeekAround(center);
+            weekStripEl.innerHTML = days.map(item => `
+                <div class="mb-cal-day ${item.dk === centerDateKey ? 'active' : ''}" data-date-key="${item.dk}">
+                    <div class="mb-day-box ${item.dk === centerDateKey ? 'active' : ''}">
+                        <div class="mb-dow">${item.dow}</div>
+                        <div class="mb-date">${item.day}</div>
+                        <div class="mb-count-badge"></div>
+                        <div class="mb-height-bar" style="height: 14px;"></div>
+                    </div>
+                </div>
+            `).join('');
+            
+            // Re-bind clicks
+            weekStripEl.querySelectorAll('.mb-cal-day').forEach(el => {
+                const dk = el.getAttribute('data-date-key');
+                el.addEventListener('click', () => {
+                    const target = dk ? document.getElementById('day-' + dk) : null;
+                    if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    updateWeekStrip(dk);
+                });
+            });
+            
+            // Scroll to center (optional, since we re-render centering the items, default scroll is 0)
+            // But we might want to ensure it looks centered. 
+            // Since we render 7 items and container is flex, they just sit there. 
+            // If screen is narrow, we might need scroll.
+            // Let's try to center the active item.
+            const activeEl = weekStripEl.querySelector('.mb-cal-day.active');
+            if (activeEl) {
+                const left = activeEl.offsetLeft - (weekStripEl.clientWidth / 2 - activeEl.clientWidth / 2);
+                weekStripEl.scrollTo({ left: Math.max(0, left), behavior: 'smooth' });
+            }
+        }
+        
+        // Replace slideWeekTo with updateWeekStrip for compatibility
+        function slideWeekTo(k) { updateWeekStrip(k); }
+
+        // Initial render if needed (optional, server renders initial state)
+        // If we want to ensure dynamic behavior takes over immediately:
+        // We can leave initial server render as is.
+        
+        // Month cell click listener
+        // (Removed previous click listener to avoid duplicate actions since we handle it in pointerup now)
+        // const monthGrid = document.getElementById('mbMonthGrid');
+        // if (monthGrid) { ... }
+
+        if (monthSliderEl) {
+            const panels = Array.from(monthSliderEl.querySelectorAll('.mb-month-panel'));
+            // Default: Try to find the panel that matches "today"
+            // We use the 'mb-month-title' logic or data attributes if available.
+            // Since we don't have explicit month ID on panel, let's rely on the fact that
+            // panels are generated based on `months_view` list.
+            // In app.py, `months_view` is generated with `months_back=2` and `months_forward=2`.
+            // So the list is [M-2, M-1, Current, M+1, M+2]. Total 5.
+            // The current month is at index 2 (0-based).
+            // Let's dynamically find the middle index or just default to 2.
+            
+            // Safer logic: Find the panel that contains the "mb-cal-day active" which represents today (if highlighted by server)
+            // But server only highlights "active" for dates that have moments? No, `active_date_keys` are dates with moments.
+            // Is there a "today" highlight? 
+            // If not, we fall back to the middle index logic from backend `_month_grid(..., months_back=2)`.
+            // So index 2 is the current month.
+            
+            if (panels.length >= 3) {
+                 monthIndex = 2; 
+            } else {
+                 monthIndex = Math.max(0, panels.length - 1);
+            }
+            monthSliderEl.style.transform = 'translateX(' + (-monthIndex * 100) + '%)';
+            let sx = 0, sy = 0, lx = 0, ly = 0, pid = null, sliding = false;
+            function pd(e){ if(e.target && e.target.closest('.mb-month-cell')) return; e.preventDefault(); }
+            monthGridEl.addEventListener('pointerdown', e => {
+                if (!monthExpanded) return;
+                pid = e.pointerId;
+                sx = lx = e.clientX; sy = ly = e.clientY;
+                monthGridEl.setPointerCapture(pid);
+                sliding = false;
+            });
+            monthGridEl.addEventListener('pointermove', e => {
+                if (!monthExpanded || pid===null || e.pointerId!==pid) return;
+                lx = e.clientX; ly = e.clientY;
+                const dx = lx - sx, dy = ly - sy;
+                if (!sliding) {
+                    if (Math.abs(dx) < 10 || Math.abs(dx) < Math.abs(dy)*1.5) return;
+                    sliding = true;
+                }
+                pd(e);
+                const w = monthGridEl.clientWidth || 1;
+                const offset = (-monthIndex*100) + (dx/w*100);
+                monthSliderEl.style.transform = 'translateX(' + offset + '%)';
+            });
+            function endSlide(e) {
+                if (pid===null) return;
+                try{ monthGridEl.releasePointerCapture(pid); }catch(_){}
+                const dx = lx - sx;
+                if (sliding) {
+                    if (dx > 80) monthIndex = Math.max(0, monthIndex - 1);
+                    else if (dx < -80) monthIndex = Math.min(panels.length - 1, monthIndex + 1);
+                } else {
+                    // Not sliding -> Treat as tap
+                    let cell = null;
+                    try {
+                        const elAtPoint = document.elementFromPoint(lx, ly);
+                        if (elAtPoint) cell = elAtPoint.closest('.mb-month-cell');
+                    } catch (_) {}
+                    if (!cell && e && e.target) {
+                        cell = e.target.closest('.mb-month-cell');
+                    }
+                    if (cell) {
+                        const dk = cell.getAttribute('data-date-key');
+                        if (dk) {
+                            const target = document.getElementById('day-' + dk);
+                            if (target) {
+                                target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                                applyMonth(false);
+                                // Animate week strip to selected date
+                                slideWeekTo(dk);
+                            }
+                        }
+                    }
+                }
+                monthSliderEl.style.transform = 'translateX(' + (-monthIndex * 100) + '%)';
+                pid = null; sliding = false;
+            }
+            monthGridEl.addEventListener('pointerup', endSlide);
+            monthGridEl.addEventListener('pointercancel', endSlide);
+            monthGridEl.addEventListener('pointerleave', e => { if (pid!==null && e.pointerId===pid) endSlide(); });
+        }
+        document.querySelectorAll('.mb-date-header').forEach(h=>{
+            const parent = h.parentElement;
+            if(!parent) return;
+            const id = parent.getAttribute('id');
+            const dateKey = parent.id.replace('day-','');
+            h.addEventListener('click',()=>{
+                const target = document.getElementById(''+id);
+                if(target) target.scrollIntoView({behavior:'smooth', block:'start'});
+            });
+        });
+        document.querySelectorAll('.mb-cal-day.active').forEach(el=>{
+            el.style.cursor='pointer';
+            el.addEventListener('click',()=>{
+                const days = document.querySelectorAll('.mb-day-section');
+                if(days.length){ days[0].scrollIntoView({behavior:'smooth', block:'start'}); }
+            });
+        });
+
+        // Scroll synchronization for date header
+        const scrollContainer = document.querySelector('.mb-timeline-scroll');
+        const monthTitleEl = document.querySelector('.mb-month-title');
+        
+        if (scrollContainer && monthTitleEl) {
+            let scrollTimer = null;
+            scrollContainer.addEventListener('scroll', () => {
+                if (scrollTimer) clearTimeout(scrollTimer);
+                scrollTimer = setTimeout(() => {
+                    const daySections = document.querySelectorAll('.mb-day-section');
+                    let currentSection = null;
+                    const base = scrollContainer.scrollTop + 120; // offset within container
+                    for (const section of daySections) {
+                        const top = section.offsetTop;
+                        const bottom = top + section.offsetHeight;
+                        if (top <= base && bottom >= base) {
+                            currentSection = section;
+                            break;
+                        }
+                    }
+                    
+                    if (currentSection) {
+                        const dateKey = currentSection.id.replace('day-', '');
+                        // Parse dateKey (YYYY-MM-DD) to Month Year
+                        try {
+                            const [y, m, d] = dateKey.split('-');
+                            const dateObj = new Date(y, m - 1, d);
+                            const monthName = dateObj.toLocaleString('en-US', { month: 'short' });
+                            const newTitle = `${monthName}. ${y}`;
+                            if (monthTitleEl.textContent !== newTitle) {
+                                monthTitleEl.textContent = newTitle;
+                            }
+                        } catch (e) {}
+                        if (!monthExpanded && weekStripEl) {
+                            slideWeekTo(dateKey);
+                        }
+                    }
+                }, 100);
+            });
+        }
+    });
+
+    // Long-press drag to delete
+    (function enableCardDelete() {
+        let pressTimer = null;
+        let ghost = null;
+        let origin = null;
+        let startX = 0, startY = 0;
+        let isInside = false;
+
+        function haptic(pattern) {
+            if (navigator.vibrate) navigator.vibrate(pattern);
+        }
+
+        function startLongPress(card, e) {
+            if (pressTimer) clearTimeout(pressTimer);
+            const pid = e.pointerId;
+            // Visual feedback that press is happening could be added here
+            pressTimer = setTimeout(() => {
+                __cardDragging = true;
+                origin = card;
+                
+                // CRITICAL: Release capture from carousel so window events fire reliably
+                if (card.parentElement && card.parentElement.releasePointerCapture) {
+                    try { card.parentElement.releasePointerCapture(pid); } catch(err) {
+                        console.log('Failed to release capture', err);
+                    }
+                }
+
+                // Show drop zone
+                dropZone.classList.add('active');
+                haptic(50); // Short tick
+
+                const rect = card.getBoundingClientRect();
+                ghost = card.cloneNode(true);
+                ghost.style.position = 'fixed';
+                ghost.style.left = rect.left + 'px';
+                ghost.style.top = rect.top + 'px';
+                ghost.style.width = rect.width + 'px';
+                ghost.style.height = rect.height + 'px';
+                ghost.style.zIndex = '2147483647';
+                ghost.style.transform = 'translate(0, 0) scale(0.9)';
+                ghost.style.filter = 'brightness(1.1)';
+                ghost.style.opacity = '0.85'; // Slightly more transparent
+                ghost.classList.add('ghost');
+                
+                // Remove interactive elements from ghost to prevent weirdness
+                ghost.querySelectorAll('.mb-tag').forEach(t => t.style.display = 'none');
+                
+                document.body.appendChild(ghost);
+                
+                // Offset calculation for smooth dragging (center under finger)
+                // We'll transition the ghost to be centered on the finger
+                ghost.style.transition = 'transform 0.1s ease-out';
+                setTimeout(() => {
+                     ghost.style.transform = 'translate(-50%, -50%) scale(0.6) rotate(3deg)';
+                     ghost.style.transition = 'none'; // Disable transition for direct tracking
+                }, 10);
+
+            }, 400); // 400ms long press
+            startX = e.clientX; startY = e.clientY;
+        }
+
+        function clearState() {
+            __cardDragging = false;
+            dropZone.classList.remove('active');
+            dropZone.classList.remove('highlight');
+            isInside = false;
+            if (ghost) { 
+                ghost.remove(); 
+                ghost = null; 
+            }
+            origin = null;
+            if (pressTimer) { clearTimeout(pressTimer); pressTimer = null; }
+        }
+
+        function onMove(e) {
+            // Cancel long press if moved too much before activation
+            if (pressTimer && !__cardDragging) {
+                const dx = e.clientX - startX;
+                const dy = e.clientY - startY;
+                if (dx*dx + dy*dy > 100) { // 10px threshold
+                    clearTimeout(pressTimer);
+                    pressTimer = null;
+                }
+            }
+
+            if (!__cardDragging || !ghost) return;
+            e.preventDefault(); // Prevent scrolling while dragging
+
+            ghost.style.left = e.clientX + 'px';
+            ghost.style.top = e.clientY + 'px';
+
+            const dz = dropZone.getBoundingClientRect();
+            // Expanded hit area for better UX
+            const hitMargin = 50; // Increased margin
+            const nowInside = e.clientX >= dz.left - hitMargin && 
+                              e.clientX <= dz.right + hitMargin && 
+                              e.clientY >= dz.top - hitMargin && 
+                              e.clientY <= dz.bottom + hitMargin;
+            
+            if (nowInside !== isInside) {
+                isInside = nowInside;
+                if (isInside) {
+                    dropZone.classList.add('highlight');
+                    dropZone.querySelector('.mb-delete-text').textContent = 'Release!';
+                    haptic(20);
+                } else {
+                    dropZone.classList.remove('highlight');
+                    dropZone.querySelector('.mb-delete-text').textContent = 'Release to Delete';
+                }
+            }
+        }
+
+        function onUp(e) {
+            if (pressTimer) { clearTimeout(pressTimer); pressTimer = null; }
+            if (!__cardDragging || !origin) { clearState(); return; }
+            
+            if (isInside) {
+                haptic([30, 50]);
+                const id = origin.getAttribute('data-moment-id');
+                if (!id) {
+                    alert('Error: Moment ID missing');
+                    clearState();
+                    return;
+                }
+                
+                // Optimistic UI update
+                origin.classList.add('deleting');
+                
+                fetch('/moments/delete', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ id })
+                }).then(async (res) => {
+                    const ct = res.headers.get('content-type') || '';
+                    let data = {};
+                    let text = '';
+                    if (ct.includes('application/json')) {
+                        try { data = await res.json(); } catch (_) { data = {}; }
+                    } else {
+                        try { text = await res.text(); } catch (_) { text = ''; }
+                    }
+                    if (!res.ok || (data && data.error)) {
+                        const msg = (data && (data.message || data.error)) || (text ? text.slice(0, 200) : `HTTP ${res.status}`);
+                        throw new Error(msg);
+                    }
+                    return data;
+                }).then(data => {
+                    if (data && data.ok) {
+                        const originRef = origin;
+                        setTimeout(() => {
+                            const parentCarousel = originRef ? originRef.parentElement : null;
+                            if (originRef) originRef.remove();
+                            // Refresh carousel layout if needed
+                            // (If using the stack logic, we might need to re-init or it might auto-adjust on next interaction)
+                            // Ideally we trigger a layout update:
+                            if (parentCarousel && parentCarousel.children.length === 0) {
+                                const daySection = parentCarousel.closest('.mb-day-section');
+                                if (daySection) daySection.remove();
+                            } else if (parentCarousel) {
+                                const delIndex = originRef ? parseInt(originRef.dataset.i || '0', 10) : 0;
+                                if (typeof parentCarousel.__mbOnDelete === 'function') {
+                                    parentCarousel.__mbOnDelete(delIndex);
+                                } else if (typeof parentCarousel.__mbRefresh === 'function') {
+                                    parentCarousel.__mbRefresh();
+                                }
+                            }
+                            clearState();
+                        }, 400);
+                    } else {
+                        origin.classList.remove('deleting');
+                        alert('Delete failed: ' + (data && (data.error || data.message) || 'Unknown error'));
+                        clearState();
+                    }
+                }).catch((err) => {
+                    origin.classList.remove('deleting');
+                    alert('Delete error: ' + err.message);
+                    clearState();
+                });
+            } else {
+                // Return animation for ghost?
+                // For now just clear
+                clearState();
+            }
+        }
+
+        // Attach events globally for move/up to handle dragging outside card
+        window.addEventListener('pointermove', onMove, { passive: false });
+        window.addEventListener('pointerup', onUp);
+        window.addEventListener('pointercancel', clearState);
+
+        document.querySelectorAll('.mb-moment-card').forEach(card => {
+            card.addEventListener('pointerdown', (e) => startLongPress(card, e));
+            // We don't need individual listeners for move/up on cards anymore since we used window
+        });
+    })();
+</script>
+ 
+{% endblock %}

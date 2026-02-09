@@ -1,0 +1,201 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<div class="phone-frame refine-page">
+    <div class="refine-header-bg" style="background-image: url('{{ url_for('static', filename='uploads/' + image) }}');"></div>
+
+    <div class="refine-header-nav">
+        <a class="refine-nav-left" href="{{ url_for('main.camera') }}" style="text-decoration:none;">
+            <div class="refine-back-icon">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
+            </div>
+            <span>Last step</span>
+        </a>
+        <div class="refine-date-display">
+            <div class="refine-date-main">January 31th</div>
+            <span class="refine-date-sub">2026</span>
+        </div>
+    </div>
+
+    <div class="refine-scroll-container">
+        <div class="refine-user-text-card" id="editor" contenteditable="true">{% for p in parts -%}{% if p.type == 'highlight' -%}<span id="{{ p.target_id }}" class="refine-segment refine-seg-{{ p.color }}" data-target-id="{{ p.target_id }}" draggable="false">{{ p.content }}</span>{%- else -%}{{ p.content }}{%- endif -%}{%- endfor %}
+        </div>
+
+        <div class="refine-feedback-row">
+            <div style="display:flex; flex-direction:column; align-items:flex-end; gap:6px;">
+                {% if emotional_feedback %}
+                <div class="refine-feedback-bubble" style="background:#fffaf0; color:#d97706;">{{ emotional_feedback }}</div>
+                {% endif %}
+            </div>
+            <div class="refine-ai-avatar main-circle" style="width: 32px; height: 32px; font-size: 10px; line-height: 32px;">OwO</div>
+        </div>
+
+        {% if not perfect %}
+        <div class="recommendation-section">
+            <div class="refine-section-header">
+                <div class="refine-orange-line"></div>
+                <span class="refine-section-title">Recommended improvements:</span>
+            </div>
+
+            {% for rec in recs %}
+                <div class="rec-card {{ rec.color }}" draggable="true" data-target="{{ rec.target_id }}" data-text="{{ rec.text }}">
+                    {{ rec.text }}
+                    <div class="drag-hint">Drag to apply</div>
+                </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        {% if perfect %}
+        <div class="perfect-badge-container">
+            <div class="perfect-star">🌟</div>
+            <div class="perfect-title">Perfect Expression!</div>
+            <div class="perfect-score">AI Score: {{ score }}/100</div>
+        </div>
+        {% endif %}
+
+        <button class="save-btn" id="saveBtn">Save and Done!</button>
+
+
+
+        <form id="saveForm" action="{{ url_for('diary.save_diary') }}" method="post" style="display:none;">
+            <input type="hidden" name="image" value="{{ image }}">
+            <input type="hidden" name="content" id="finalContent">
+        </form>
+    </div>
+
+    <script>
+        const knowledge = {{ (knowledge or {}) | tojson }};
+
+        function showExplanation(targetId, anchorEl) {
+            // Remove existing inline explanations
+            document.querySelectorAll('.inline-explanation').forEach(el => el.remove());
+
+            const data = knowledge[targetId];
+            if (!data) return;
+
+            const original = (data.original || '').replace(/</g, '&lt;');
+            const improved = (data.improved || '').replace(/</g, '&lt;');
+            const reason = (data.explanation_cn || '').replace(/</g, '&lt;');
+
+            const div = document.createElement('div');
+            div.className = 'inline-explanation';
+            div.style.cssText = 'background:#f8f9fa; border-left:3px solid #34C759; padding:10px; margin-top:8px; border-radius:4px; font-size:13px; color:#333; animation: fadeIn 0.3s ease;';
+            div.innerHTML = `
+                <div style="margin-bottom:6px;">
+                    <span style="color:#999; font-size:12px;">Original:</span> <del>${original}</del><br>
+                    <span style="color:#34C759; font-weight:600;">Improved:</span> ${improved}
+                </div>
+                <div>${reason}</div>
+            `;
+
+            if (anchorEl && anchorEl.parentNode) {
+                anchorEl.parentNode.insertBefore(div, anchorEl.nextSibling);
+            }
+        }
+
+        function replaceText(targetId, text, anchorEl) {
+            const target = document.getElementById(targetId);
+            if (!target) return;
+            target.textContent = (text || '').trim();
+            target.classList.remove('animate-change');
+            void target.offsetWidth;
+            target.classList.add('animate-change');
+            
+            // If anchorEl is not provided, try to find the rec-card
+            if (!anchorEl) {
+                anchorEl = document.querySelector(`.rec-card[data-target="${targetId}"]`);
+            }
+            
+            showExplanation(targetId, anchorEl);
+        }
+
+        document.querySelectorAll('.rec-card').forEach(card => {
+            const targetId = card.getAttribute('data-target');
+            const text = card.getAttribute('data-text');
+            
+            card.addEventListener('click', function() {
+                replaceText(targetId, text, this);
+            });
+            
+            card.addEventListener('dragstart', (e) => {
+                e.dataTransfer.setData('text/plain', text);
+                e.dataTransfer.setData('application/json', JSON.stringify({ targetId, text }));
+            });
+        });
+        
+        document.querySelectorAll('.refine-segment').forEach(seg => {
+            const targetId = seg.getAttribute('id');
+            
+            seg.addEventListener('click', (e) => {
+                e.stopPropagation();
+                // When clicking segment, show explanation below the corresponding recommendation card if it exists
+                const recCard = document.querySelector(`.rec-card[data-target="${targetId}"]`);
+                showExplanation(targetId, recCard || seg); // Fallback to segment itself if no card
+            });
+
+            seg.addEventListener('dragover', (e) => e.preventDefault());
+            seg.addEventListener('drop', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                try {
+                    const raw = e.dataTransfer.getData('application/json');
+                    if (raw) {
+                        const payload = JSON.parse(raw);
+                        if (payload && payload.targetId === targetId && payload.text) {
+                            // Find the card to anchor explanation
+                            const card = document.querySelector(`.rec-card[data-target="${targetId}"]`);
+                            replaceText(targetId, payload.text, card);
+                        }
+                    }
+                } catch (_) {}
+            });
+        });
+
+
+        // Allow dropping ghost words into editor area generally
+        const editor = document.getElementById('editor');
+        editor.addEventListener('dragover', (e) => e.preventDefault());
+        editor.addEventListener('drop', (e) => {
+             // If dropping on a segment, it's handled by segment listener (stopPropagation)
+             // If dropping on free text area:
+             e.preventDefault();
+             if (e.target.classList.contains('refine-segment')) return;
+             
+             // Check if it's a recommendation drop (smart replace)
+             try {
+                 const raw = e.dataTransfer.getData('application/json');
+                 if (raw) {
+                     const payload = JSON.parse(raw);
+                     if (payload && payload.targetId && payload.text) {
+                         // User dropped a specific correction loosely in the box
+                         // Find the target and replace it automatically
+                         replaceText(payload.targetId, payload.text);
+                         return; 
+                     }
+                 }
+             } catch (_) {}
+
+             const text = e.dataTransfer.getData('text/plain');
+             if (text) {
+                 // Insert text at cursor position if possible, or append
+                 // Simplified: Append with space
+                 if (document.getSelection && document.getSelection().rangeCount > 0) {
+                     const range = document.getSelection().getRangeAt(0);
+                     if (editor.contains(range.commonAncestorContainer)) {
+                         range.deleteContents();
+                         range.insertNode(document.createTextNode(text));
+                         return;
+                     }
+                 }
+                 editor.innerText += (editor.innerText ? ' ' : '') + text;
+             }
+        });
+
+        document.getElementById('saveBtn').addEventListener('click', () => {
+            const content = document.getElementById('editor').innerText.replace(/\s+/g, ' ').trim();
+            document.getElementById('finalContent').value = content;
+            document.getElementById('saveForm').submit();
+        });
+    </script>
+{% endblock %}

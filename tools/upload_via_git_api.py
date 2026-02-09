@@ -117,7 +117,7 @@ def update_or_create_ref(headers, login, repo, branch, commit_sha, create=False)
         rr = api(headers, "PATCH",
                  f"https://api.github.com/repos/{login}/{repo}/git/refs/heads/{branch}",
                  json={"sha": commit_sha, "force": True})
-        if rr.status_code not in (200):
+        if rr.status_code != 200:
             raise RuntimeError(f"update ref failed: {rr.status_code} {rr.text[:200]}")
 
 def main():

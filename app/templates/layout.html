@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+    <meta http-equiv="Pragma" content="no-cache" />
+    <meta http-equiv="Expires" content="0" />
+    <title>Moments v2.0</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}?v=2">
+</head>
+<body>
+    <div class="app-container">
+        <div class="status-bar">
+            <span>9:41</span>
+            <span>📶 🔋</span>
+        </div>
+        {% block content %}{% endblock %}
+        <div class="home-indicator"></div>
+    </div>
+    <script>
+        (function(){
+            function pickVoice(voices, model){
+                var map = {
+                    'en_us_female': { langs: ['en-US'], names: ['Female','Google US English','Samantha','Allison','Zira'] },
+                    'en_us_male': { langs: ['en-US'], names: ['Male','Alex','Google US English','David'] },
+                    'en_uk_female': { langs: ['en-GB','en-UK'], names: ['Female','Google UK English','Serena'] },
+                };
+                var pref = map[model] || map['en_us_female'];
+                var v = voices.find(function(v){ return pref.langs.some(function(p){ return v.lang && v.lang.indexOf(p)===0; }) && pref.names.some(function(n){ return v.name && v.name.indexOf(n)>=0; }); });
+                if (!v) v = voices.find(function(v){ return v.lang && v.lang.indexOf((pref.langs||['en-US'])[0])===0; });
+                return v || voices[0];
+            }
+            window.speakWithProfile = function(text){
+                try {
+                    fetch('/profile_voice').then(function(r){ return r.json(); }).then(function(p){
+                        var utter = new SpeechSynthesisUtterance(text);
+                        var rv = parseFloat(p.rate || '1.0');
+                        utter.rate = Math.max(0.5, Math.min(1.5, rv));
+                        var voices = window.speechSynthesis.getVoices();
+                        var voice = pickVoice(voices, p.model || 'en_us_female');
+                        if (voice) utter.voice = voice;
+                        window.speechSynthesis.cancel();
+                        window.speechSynthesis.speak(utter);
+                    }).catch(function(){
+                        var utter = new SpeechSynthesisUtterance(text);
+                        window.speechSynthesis.cancel();
+                        window.speechSynthesis.speak(utter);
+                    });
+                } catch(e){}
+            };
+        })();
+    </script>
+</body>
+</html>

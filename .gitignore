@@ -39,3 +39,8 @@ Matcha-TTS.zip
 # OS files
 .DS_Store
 Thumbs.db
+
+letters_store.json
+users_store.json
+diary_store.json
+logs/

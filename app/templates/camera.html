@@ -1,0 +1,354 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<style>
+    /* Camera Page Specific Styles */
+    .app-container {
+        background-color: #000 !important; /* Force black background */
+    }
+    
+    .status-bar {
+        color: white !important; /* White text for status bar */
+        z-index: 20; /* Ensure on top of video */
+    }
+
+    /* Video Feed */
+    #camera-feed {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        z-index: 1;
+    }
+
+    /* Scan Frame */
+    .scan-frame {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        width: 85%;
+        height: 55%;
+        pointer-events: none;
+        z-index: 10;
+    }
+
+    .corner {
+        position: absolute;
+        width: 60px;
+        height: 60px;
+        border: 4px solid white;
+        box-shadow: 0 0 4px rgba(0,0,0,0.3); /* Subtle shadow for visibility */
+    }
+
+    .top-left { top: 0; left: 0; border-right: none; border-bottom: none; border-top-left-radius: 30px; }
+    .top-right { top: 0; right: 0; border-left: none; border-bottom: none; border-top-right-radius: 30px; }
+    .bottom-left { bottom: 0; left: 0; border-right: none; border-top: none; border-bottom-left-radius: 30px; }
+    .bottom-right { bottom: 0; right: 0; border-left: none; border-top: none; border-bottom-right-radius: 30px; }
+
+    /* Controls */
+    .controls {
+        position: absolute;
+        bottom: 40px;
+        width: 100%;
+        display: flex;
+        justify-content: space-around;
+        align-items: center;
+        padding: 0 20px;
+        z-index: 20;
+    }
+
+    .btn-circle {
+        background: rgba(255, 255, 255, 0.2);
+        backdrop-filter: blur(10px);
+        border-radius: 50%;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        color: white;
+        cursor: pointer;
+        transition: transform 0.2s;
+    }
+    .btn-circle:active { transform: scale(0.95); }
+
+    .btn-small { width: 50px; height: 50px; font-size: 20px;}
+    .btn-large { 
+        width: 80px; 
+        height: 80px; 
+        border: 4px solid rgba(255, 255, 255, 0.8);
+        background: transparent;
+        position: relative;
+    }
+
+    /* Shutter Button Inner */
+    .shutter-inner {
+        width: 66px;
+        height: 66px;
+        background: white;
+        border-radius: 50%;
+        border: 2px solid #333; /* Contrast ring */
+    }
+    
+    /* Chrome-like logo shutter as per reference, simplified */
+    .chrome-shutter {
+        width: 100%; height: 100%;
+        border-radius: 50%;
+        position: relative;
+        overflow: hidden;
+    }
+    .chrome-shutter::before {
+        content: ''; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+        width: 20px; height: 20px; background: white; border-radius: 50%; z-index: 2;
+        border: 2px solid #ccc;
+    }
+    .chrome-segment {
+        position: absolute; width: 100%; height: 100%;
+        top: 0; left: 0;
+        border-radius: 50%;
+        border: 6px solid white;
+        box-sizing: border-box;
+    }
+    
+    .home-indicator {
+        background: white !important; /* White indicator on dark bg */
+        z-index: 20;
+    }
+    /* ===== Magic Transition Overlay ===== */
+    .magic-overlay {
+        position: fixed;
+        inset: 0;
+        display: none;
+        align-items: center;
+        justify-content: center;
+        background: radial-gradient(1200px 600px at 50% 20%, rgba(43,238,108,0.18), rgba(0,0,0,0.75));
+        z-index: 1000;
+    }
+    .magic-stage {
+        width: 82%;
+        max-width: 420px;
+        position: relative;
+        padding: 16px;
+        border-radius: 18px;
+        background: rgba(255,255,255,0.06);
+        box-shadow: 0 30px 80px rgba(0,0,0,0.6);
+        backdrop-filter: blur(10px);
+    }
+    .magic-card {
+        position: relative;
+        border-radius: 14px;
+        overflow: hidden;
+        box-shadow: 0 14px 40px rgba(0,0,0,0.5);
+        transform: translateZ(0);
+    }
+    .magic-card img, .magic-card canvas {
+        width: 100%;
+        height: auto;
+        display: block;
+    }
+    .seal-tape {
+        position: absolute;
+        left: 50%;
+        top: -14px;
+        transform: translateX(-50%) rotate(3deg);
+        width: 88px;
+        height: 22px;
+        background: rgba(255,255,255,0.35);
+        backdrop-filter: blur(3px);
+        border-radius: 8px;
+        box-shadow: 0 2px 6px rgba(0,0,0,0.16);
+        animation: tapePulse 1.6s ease-in-out infinite;
+    }
+    @keyframes tapePulse {
+        0%,100% { transform: translateX(-50%) rotate(3deg); opacity: 0.85; }
+        50% { transform: translateX(-50%) rotate(-2deg); opacity: 1; }
+    }
+    .magic-ring {
+        position: absolute;
+        inset: -14px;
+        border-radius: 18px;
+        pointer-events: none;
+        background: conic-gradient(from 0deg, rgba(43,238,108,0.6), rgba(43,238,108,0.05), rgba(43,238,108,0.6));
+        mask: radial-gradient(farthest-side, rgba(0,0,0,0) calc(100% - 8px), #000 100%);
+        animation: spin 1.8s linear infinite;
+        opacity: 0.6;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .scan-line {
+        position: absolute;
+        left: 0; right: 0;
+        height: 2px;
+        background: linear-gradient(90deg, transparent, rgba(43,238,108,0.8), transparent);
+        animation: scanDown 2.2s cubic-bezier(.2,.7,.3,1) infinite;
+    }
+    @keyframes scanDown {
+        0% { top: 6%; opacity: 0.6; }
+        50% { top: 92%; opacity: 0.9; }
+        100% { top: 6%; opacity: 0.6; }
+    }
+    .magic-status {
+        margin-top: 14px;
+        color: #c9ffde;
+        font-weight: 700;
+        font-size: 14px;
+        text-align: center;
+        letter-spacing: .4px;
+    }
+    .magic-sub {
+        margin-top: 6px;
+        color: #a6f5c8;
+        font-size: 12px;
+        text-align: center;
+        opacity: 0.85;
+    }
+</style>
+
+<!-- Camera Feed -->
+<video id="camera-feed" autoplay playsinline muted></video>
+
+<!-- Scan Frame -->
+<div class="scan-frame">
+    <div class="corner top-left"></div>
+    <div class="corner top-right"></div>
+    <div class="corner bottom-left"></div>
+    <div class="corner bottom-right"></div>
+</div>
+
+<!-- Controls -->
+<div class="controls">
+    <!-- Back Button -->
+    <a href="{{ url_for('main.index') }}" class="btn-circle btn-small" style="text-decoration: none;">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+    </a>
+    
+    <!-- Shutter Button -->
+    <div class="btn-circle btn-large" id="shutter-btn">
+        <div class="chrome-shutter">
+             <!-- Simplified styling for the button in the image -->
+             <div style="width:100%; height:100%; border: 4px solid white; border-radius:50%;"></div>
+        </div>
+    </div>
+
+    <!-- Gallery/Upload Button -->
+    <div class="btn-circle btn-small" onclick="document.getElementById('fileInput').click()">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>
+    </div>
+</div>
+
+<!-- Hidden File Input & Canvas -->
+<form action="{{ url_for('api.upload_file') }}" method="post" enctype="multipart/form-data" id="uploadForm">
+    <input type="file" name="file" id="fileInput" accept="image/*" style="display: none;" onchange="document.getElementById('uploadForm').submit()">
+    <input type="hidden" name="image_data" id="imageDataInput" />
+</form>
+<canvas id="capture-canvas" style="display: none;"></canvas>
+
+<!-- Magic Transition Overlay -->
+<div class="magic-overlay" id="magicOverlay">
+    <div class="magic-stage">
+        <div class="magic-card">
+            <img id="magicPreview" alt="preview" />
+            <div class="magic-ring"></div>
+            <div class="scan-line"></div>
+            <div class="seal-tape"></div>
+        </div>
+        <div class="magic-status">施展魔法中 · 正在封装你的瞬间</div>
+        <div class="magic-sub">请稍候，AI 正在分析画面元素与语义</div>
+    </div>
+    <!-- optional decorative particles could be added -->
+</div>
+
+<script>
+    // Camera Logic
+    const video = document.getElementById('camera-feed');
+    const shutterBtn = document.getElementById('shutter-btn');
+    const canvas = document.getElementById('capture-canvas');
+    const magicOverlay = document.getElementById('magicOverlay');
+    const magicPreview = document.getElementById('magicPreview');
+    
+    // Access Camera
+    async function initCamera() {
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ 
+                video: { facingMode: "environment" } // Prefer back camera
+            });
+            video.srcObject = stream;
+        } catch (err) {
+            console.error("Error accessing camera:", err);
+            video.srcObject = null;
+            video.style.display = 'none';
+            const note = document.createElement('div');
+            note.className = 'cam-fallback-note';
+            note.textContent = '摄像头不可用 · 请点击右侧按钮从相册选择图片';
+            note.style.position = 'absolute';
+            note.style.bottom = '120px';
+            note.style.left = '0';
+            note.style.right = '0';
+            note.style.textAlign = 'center';
+            note.style.color = '#fff';
+            note.style.fontSize = '14px';
+            note.style.fontWeight = '600';
+            note.style.zIndex = '20';
+            document.body.appendChild(note);
+        }
+    }
+    
+    initCamera();
+
+    function showMagic(dataUrl) {
+        try {
+            if (dataUrl) {
+                magicPreview.src = dataUrl;
+            } else {
+                // fallback: draw current video to canvas snapshot
+                canvas.width = video.videoWidth;
+                canvas.height = video.videoHeight;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                magicPreview.src = canvas.toDataURL('image/jpeg', 0.85);
+            }
+        } catch (e) {}
+        magicOverlay.style.display = 'flex';
+    }
+
+    // Capture Photo
+    shutterBtn.addEventListener('click', () => {
+        if (!video.srcObject || !video.videoWidth || !video.videoHeight) {
+            const fi = document.getElementById('fileInput');
+            if (fi) try { fi.click(); } catch(e){}
+            return;
+        }
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        const uploadForm = document.getElementById('uploadForm');
+        const imageDataInput = document.getElementById('imageDataInput');
+        try { showMagic(canvas.toDataURL('image/jpeg', 0.9)); } catch(e) {}
+        shutterBtn.style.opacity = '0.5';
+        try {
+            imageDataInput.value = canvas.toDataURL('image/jpeg', 0.9);
+        } catch(e) {
+            imageDataInput.value = '';
+        }
+        uploadForm.submit();
+    });
+
+    // Upload via gallery
+    const fileInput = document.getElementById('fileInput');
+    fileInput.addEventListener('change', () => {
+        try {
+            const file = fileInput.files && fileInput.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = () => showMagic(reader.result);
+                reader.readAsDataURL(file);
+            } else {
+                showMagic(null);
+            }
+        } catch (e) {
+            showMagic(null);
+        }
+    });
+</script>
+{% endblock %}

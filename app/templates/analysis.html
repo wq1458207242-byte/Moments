@@ -1,0 +1,412 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<div class="phone-frame">
+    <!-- 1. Vision Layer -->
+    <div class="vision-layer" style="background-image: url('{{ url_for('static', filename='uploads/' + filename) }}');">
+        <div class="header-overlay">
+            <a href="{{ url_for('main.index') }}" class="back-btn-overlay">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
+            </a>
+            <div class="date-group">
+                <div class="date-day">Today</div>
+                <span class="date-year">2026</span>
+            </div>
+        </div>
+
+        {% for noun in analysis.visual_nouns %}
+        {% set pos = (analysis.tag_positions[noun] if (analysis.tag_positions is defined and noun in analysis.tag_positions) else None) %}
+        <div class="tag floating-tag" style="top: {{ pos.top if pos else (20 + loop.index0 * 15) }}%; left: {{ pos.left if pos else (10 + loop.index0 * 20) }}%;" draggable="true" data-word="{{ noun }}">
+            {{ noun }}
+        </div>
+        {% endfor %}
+
+        <div class="moment-badge">{{ moment_code if moment_code is defined else 'Moment001' }}</div>
+    </div>
+
+    <!-- 2. Composition Layer -->
+    <div class="composition-layer">
+        <div class="title-bar">
+            <span class="section-title">The words you might wanna use</span>
+            <span class="want-more">Want more ?</span>
+        </div>
+
+        <div class="chips-wrapper">
+            {% for phrase in analysis.support_phrases %}
+            <div class="chip" draggable="true" data-word="{{ phrase }}" style="max-width: 280px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{{ phrase }}</div>
+            {% endfor %}
+            {% if not analysis.support_phrases %}
+                {% for verb in analysis.verbs %}
+                <div class="chip" draggable="true" data-word="{{ verb }}">{{ verb }} <span>verb</span></div>
+                {% endfor %}
+                {% for adj in analysis.adjectives %}
+                <div class="chip" draggable="true" data-word="{{ adj }}">{{ adj }} <span>adj</span></div>
+                {% endfor %}
+            {% endif %}
+        </div>
+
+        <div class="input-area" id="dropZone">
+            <div id="editor" contenteditable="true" placeholder="Type or Drag cards here... Describe your moment!"></div>
+            
+            <div class="input-footer">
+                <div class="sound-icon" id="ttsBtn">
+                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path></svg>
+                </div>
+                <button class="btn-done" onclick="submitDiary()">I'm done!</button>
+            </div>
+        </div>
+        
+        <!-- Hidden form for saving -->
+        <form id="diaryForm" action="{{ url_for('api.refine') }}" method="post" style="display:none;">
+            <input type="hidden" name="image" value="{{ filename }}">
+            <input type="hidden" name="content" id="hiddenContent">
+        </form>
+    </div>
+
+    <!-- 3. Modal -->
+    <div class="modal-overlay" id="modalOverlay">
+        <div class="modal-card" id="modalCard">
+            <div id="modalContent"></div>
+        </div>
+    </div>
+</div>
+
+<script>
+    const sceneHint = {{ analysis.scene_hint | tojson }};
+    const wordCards = {{ (word_cards or {}) | tojson }};
+    const editor = document.getElementById('editor');
+    const allDraggables = document.querySelectorAll('.tag, .chip');
+
+    // Update Tag States based on input
+    function updateTagStates() {
+        const currentText = editor.innerText;
+        allDraggables.forEach(el => {
+            const word = el.getAttribute('data-word');
+            if (currentText.includes(word)) {
+                el.classList.add('used');
+            } else {
+                el.classList.remove('used');
+            }
+        });
+    }
+
+    editor.addEventListener('input', updateTagStates);
+
+    // Drag and Drop
+    const dropZone = document.getElementById('dropZone');
+
+    allDraggables.forEach(draggable => {
+        draggable.addEventListener('dragstart', (e) => {
+            let text = draggable.getAttribute('data-word');
+            e.dataTransfer.setData('text/plain', text);
+        });
+    });
+
+    dropZone.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        dropZone.style.border = '1px dashed var(--primary-orange)';
+    });
+
+    dropZone.addEventListener('dragleave', () => {
+        dropZone.style.border = '1px solid #E5E5EA';
+    });
+
+    dropZone.addEventListener('drop', (e) => {
+        e.preventDefault();
+        dropZone.style.border = '1px solid #E5E5EA';
+        const text = e.dataTransfer.getData('text/plain');
+        
+        if (text) {
+            insertTagInEditor(text);
+            setTimeout(updateTagStates, 0); 
+        }
+    });
+
+    function insertTagInEditor(text) {
+        editor.focus();
+        const span = document.createElement('span');
+        span.className = 'highlight-word';
+        span.textContent = text;
+        const space = document.createTextNode('\u00A0'); 
+
+        const sel = window.getSelection();
+        if (sel.rangeCount > 0) {
+            const range = sel.getRangeAt(0);
+            if (editor.contains(range.commonAncestorContainer)) {
+                range.deleteContents();
+                range.insertNode(space);
+                range.insertNode(span);
+                range.setStartAfter(space);
+                sel.removeAllRanges();
+                sel.addRange(range);
+            } else {
+                editor.appendChild(span);
+                editor.appendChild(space);
+            }
+        } else {
+            editor.appendChild(span);
+            editor.appendChild(space);
+        }
+    }
+
+    // Modal Logic
+    const modal = document.getElementById('modalOverlay');
+    const modalContent = document.getElementById('modalContent');
+    const modalCard = document.getElementById('modalCard');
+
+    document.querySelectorAll('.tag, .chip').forEach(tag => {
+        tag.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const word = tag.getAttribute('data-word');
+            const isChip = tag.classList.contains('chip');
+
+            if (isChip) {
+                // Simplified "dictionary entry" view for chips
+                modalContent.innerHTML = `
+                    <div class="wc-header">
+                        <div>
+                            <div class="wc-title" style="font-size: 24px;">${word}</div>
+                            <div class="wc-phonetic">Loading...</div>
+                        </div>
+                    </div>
+                    <div class="wc-definition" style="margin-top:8px;"> </div>
+                    <div class="wc-section-title" style="margin-top:12px;">参考例句 :</div>
+                    <div class="wc-example-en"></div>
+                    <div class="wc-example-cn"></div>
+                `;
+            } else {
+                // Full view for core tags
+                modalContent.innerHTML = `
+                    <div class="wc-header">
+                        <div>
+                            <div class="wc-title">${word}</div>
+                            <div class="wc-phonetic">加载中...</div>
+                        </div>
+                        <div class="heart-icon" id="heartBtn">♡</div>
+                    </div>
+                    <div class="wc-definition"> </div>
+                    <div class="wc-section-title">基于你水平的例句 :</div>
+                    <div class="wc-example-en"></div>
+                    <div class="wc-example-cn"></div>
+                    <div class="wc-section-title" style="margin-top: 15px;">基于场景的例句 :</div>
+                    <div class="wc-example-en wc-example-scene"></div>
+                    <div class="wc-example-cn wc-example-scene-cn"></div>
+                `;
+            }
+
+            modal.classList.add('active');
+            const renderCard = (data) => {
+                    const titleEl = modalContent.querySelector('.wc-title');
+                    const phoneticEl = modalContent.querySelector('.wc-phonetic');
+                    const defEl = modalContent.querySelector('.wc-definition');
+                    const lvlEnEl = modalContent.querySelector('.wc-example-en');
+                    const lvlCnEl = modalContent.querySelector('.wc-example-cn');
+                    const sceneEnEl = modalContent.querySelector('.wc-example-scene');
+                    const sceneCnEl = modalContent.querySelector('.wc-example-scene-cn');
+
+                    if (titleEl) titleEl.textContent = data.word || word;
+                    if (phoneticEl) {
+                        const us = data.phonetic_us ? `美: ${data.phonetic_us}` : '';
+                        const uk = data.phonetic_uk ? `英: ${data.phonetic_uk}` : '';
+                        phoneticEl.textContent = [us, uk].filter(Boolean).join('  ') || '';
+                    } else if (isChip) {
+                        // For chips, remove the "Loading..." text once loaded
+                        const ph = modalContent.querySelector('.wc-phonetic');
+                        if (ph) ph.style.display = 'none';
+                    }
+                    if (defEl) {
+                        const pos = data.pos ? `${data.pos} ` : '';
+                        defEl.innerHTML = `<b>${pos}${data.definition_cn || ''}</b>`;
+                    }
+                    if (lvlEnEl) lvlEnEl.textContent = data.examples_level_en || '';
+                    if (lvlCnEl) lvlCnEl.textContent = data.examples_level_cn || '';
+                    if (sceneEnEl) sceneEnEl.textContent = data.examples_scene_en || '';
+                    if (sceneCnEl) sceneCnEl.textContent = data.examples_scene_cn || '';
+
+                    const heart = modalContent.querySelector('#heartBtn');
+                    if (heart) {
+                        heart.addEventListener('click', (ev) => {
+                            ev.stopPropagation();
+                            const nowFav = heart.textContent === '♡';
+                            heart.textContent = nowFav ? '♥' : '♡';
+                            fetch('/word_bank/favorite', {
+                                method: 'POST',
+                                headers: {'Content-Type':'application/json'},
+                                body: JSON.stringify({ word, scene: sceneHint || '', favorite: nowFav })
+                            }).catch(()=>{});
+                        });
+                    }
+            };
+
+            if (wordCards && wordCards[word]) {
+                renderCard(wordCards[word]);
+            } else {
+                const url = `/api/word_card?word=${encodeURIComponent(word)}&scene=${encodeURIComponent(sceneHint || '')}`;
+                const load = () => {
+                    const ph = modalContent.querySelector('.wc-phonetic');
+                    if (ph) ph.textContent = '加载中...';
+                    
+                    fetch(url)
+                        .then(async res => {
+                            if (!res.ok) {
+                                const err = await res.json().catch(() => ({}));
+                                throw new Error(err.message || 'AI 生成失败，请重试');
+                            }
+                            return res.json();
+                        })
+                        .then(renderCard)
+                        .catch((err) => {
+                            modalContent.innerHTML = `
+                                <div class="wc-header">
+                                    <div>
+                                        <div class="wc-title" style="${isChip ? 'font-size: 24px;' : ''}">${word}</div>
+                                        ${!isChip ? `<div class="wc-phonetic">${(err && err.message) ? err.message : 'AI 生成失败，请重试'}</div>` : ''}
+                                    </div>
+                                </div>
+                                <div style="margin-top:18px;">
+                                    <button class="btn-done" id="retryWordCard" style="width: 100%;">Retry</button>
+                                </div>
+                            `;
+                            const retryBtn = document.getElementById('retryWordCard');
+                            if (retryBtn) retryBtn.addEventListener('click', (ev) => {
+                                ev.stopPropagation();
+                                if (isChip) {
+                                     modalContent.innerHTML = `
+                                        <div class="wc-header">
+                                            <div>
+                                                <div class="wc-title" style="font-size: 24px;">${word}</div>
+                                                <div class="wc-phonetic">Loading...</div>
+                                            </div>
+                                        </div>
+                                        <div class="wc-definition" style="margin-top:8px;"> </div>
+                                        <div class="wc-section-title" style="margin-top:12px;">参考例句 :</div>
+                                        <div class="wc-example-en"></div>
+                                        <div class="wc-example-cn"></div>
+                                    `;
+                                } else {
+                                    modalContent.innerHTML = `
+                                        <div class="wc-header">
+                                            <div>
+                                                <div class="wc-title">${word}</div>
+                                                <div class="wc-phonetic">加载中...</div>
+                                            </div>
+                                            <div class="heart-icon" id="heartBtn">♡</div>
+                                        </div>
+                                        <div class="wc-definition"> </div>
+                                        <div class="wc-section-title">基于你水平的例句 :</div>
+                                        <div class="wc-example-en"></div>
+                                        <div class="wc-example-cn"></div>
+                                        <div class="wc-section-title" style="margin-top: 15px;">基于场景的例句 :</div>
+                                        <div class="wc-example-en wc-example-scene"></div>
+                                        <div class="wc-example-cn wc-example-scene-cn"></div>
+                                    `;
+                                }
+                                load();
+                            });
+                        });
+                };
+                load();
+            }
+        });
+    });
+
+    modal.addEventListener('click', (e) => {
+        if (e.target === modal) {
+            modal.classList.remove('active');
+        }
+    });
+
+    modalCard.addEventListener('click', (e) => {
+        e.stopPropagation();
+    });
+
+    function layoutFloatingTags() {
+        const layer = document.querySelector('.vision-layer');
+        if (!layer) return;
+        const tags = Array.from(layer.querySelectorAll('.tag'));
+        if (!tags.length) return;
+        const rect = layer.getBoundingClientRect();
+        const minX = rect.width * 0.06;
+        const maxX = rect.width * 0.94;
+        const minY = rect.height * 0.16;
+        const maxY = rect.height * 0.88;
+
+        const nodes = tags.map(el => {
+            const leftPct = parseFloat((el.style.left || '50').replace('%','')) / 100;
+            const topPct = parseFloat((el.style.top || '50').replace('%','')) / 100;
+            const ax = rect.width * leftPct;
+            const ay = rect.height * topPct;
+            el.style.left = ax + 'px';
+            el.style.top = ay + 'px';
+            el.style.transform = 'translate(-50%, -50%)';
+            const b = el.getBoundingClientRect();
+            return { el, x: ax, y: ay, ax, ay, w: b.width, h: b.height };
+        });
+
+        for (let iter = 0; iter < 90; iter++) {
+            for (let i = 0; i < nodes.length; i++) {
+                const a = nodes[i];
+                let fx = 0;
+                let fy = 0;
+                for (let j = 0; j < nodes.length; j++) {
+                    if (i === j) continue;
+                    const b = nodes[j];
+                    const dx = a.x - b.x;
+                    const dy = a.y - b.y;
+                    const overlapX = (a.w + b.w) / 2 + 8 - Math.abs(dx);
+                    const overlapY = (a.h + b.h) / 2 + 8 - Math.abs(dy);
+                    if (overlapX > 0 && overlapY > 0) {
+                        const push = Math.min(overlapX, overlapY) * 0.35;
+                        const dist = Math.hypot(dx, dy) || 1;
+                        fx += (dx / dist) * push;
+                        fy += (dy / dist) * push;
+                    }
+                }
+                fx += (a.ax - a.x) * 0.05;
+                fy += (a.ay - a.y) * 0.05;
+                a.x = Math.max(minX, Math.min(maxX, a.x + fx));
+                a.y = Math.max(minY, Math.min(maxY, a.y + fy));
+            }
+        }
+
+        nodes.forEach(n => {
+            n.el.style.left = n.x + 'px';
+            n.el.style.top = n.y + 'px';
+        });
+    }
+
+    window.addEventListener('load', () => {
+        setTimeout(layoutFloatingTags, 60);
+    });
+
+    let ttsSpeaking = false;
+    let ttsUtterance = null;
+    const ttsBtn = document.getElementById('ttsBtn');
+    if (ttsBtn && window.speechSynthesis) {
+        ttsBtn.addEventListener('click', () => {
+            const text = editor.innerText.replace(/\s+/g, ' ').trim();
+            if (!text) return;
+            if (speechSynthesis.speaking || ttsSpeaking) {
+                speechSynthesis.cancel();
+                ttsSpeaking = false;
+                return;
+            }
+            ttsUtterance = new SpeechSynthesisUtterance(text);
+            ttsUtterance.lang = 'en-US';
+            ttsUtterance.rate = 0.95;
+            ttsUtterance.pitch = 1.0;
+            ttsUtterance.onend = () => { ttsSpeaking = false; };
+            ttsUtterance.onerror = () => { ttsSpeaking = false; };
+            ttsSpeaking = true;
+            speechSynthesis.speak(ttsUtterance);
+        });
+    }
+
+    // Submit Logic
+    function submitDiary() {
+        const content = editor.innerText.replace(/\s+/g, ' ').trim();
+        document.getElementById('hiddenContent').value = content;
+        document.getElementById('diaryForm').submit();
+    }
+</script>
+{% endblock %}
