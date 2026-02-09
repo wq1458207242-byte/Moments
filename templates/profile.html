@@ -1,0 +1,360 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<div class="profile-page">
+    <div class="profile-header-nav">
+        <a href="{{ url_for('index') }}" class="back-icon">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M15 18l-6-6 6-6" />
+            </svg>
+        </a>
+    </div>
+
+    <!-- Top Profile Section -->
+    <div class="profile-top-section">
+        <div class="profile-avatar-container">
+            <div class="avatar-circle">
+                <img id="profileAvatarImg" src="{{ profile.avatar and url_for('static', filename='uploads/' + profile.avatar) or url_for('static', filename='images/mlbzkwwe-3rkp256.png') }}" alt="avatar">
+                <button class="edit-avatar-btn" id="avatarBtn">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="white" stroke="white" stroke-width="3">
+                        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                        <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                    </svg>
+                </button>
+                <input type="file" id="avatarInput" accept="image/*" style="display:none;">
+            </div>
+        </div>
+        
+        <div class="profile-identity">
+            <div class="profile-name-container">
+                <div class="profile-name" id="nicknameDisplay">{{ profile.nickname }}</div>
+                <input type="text" class="profile-name-input" id="nicknameInput" value="{{ profile.nickname }}" style="display:none;">
+                <button class="edit-name-btn" id="editNameBtn">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                        <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                    </svg>
+                </button>
+            </div>
+            <div class="profile-streak">
+                <span class="streak-dot">●</span> Day {{ profile.streak_days or 1 }} Streak
+            </div>
+        </div>
+
+        <div class="profile-stats-badges">
+            <div class="stat-badge level">
+                <div class="stat-label">LEVEL</div>
+                <div class="stat-value">{{ profile.level_text or 'B1' }}</div>
+            </div>
+            <div class="stat-badge vocab">
+                <div class="stat-label">VOCAB</div>
+                <div class="stat-value">{{ profile.estimated_vocab or word_bank_count or '0' }}</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Energy Section -->
+    <div class="energy-card-new">
+        <div class="energy-header">
+            <div class="energy-icon">⚡</div>
+            <div class="energy-title">ENERGY LEVEL</div>
+            <div class="energy-value-text">{{ profile.growth_energy }} / {{ profile.growth_goal or 1000 }} XP <span class="lv-tag">Lv.{{ profile.level or 1 }}</span></div>
+        </div>
+        <div class="energy-bar-new">
+            <div class="energy-fill" style="width: {{ (profile.growth_energy / (profile.growth_goal or 1000) * 100) | round(1) }}%;"></div>
+        </div>
+    </div>
+
+    <!-- Main Actions Grid -->
+    <div class="action-grid">
+        <a href="/assessment" class="action-card proficiency">
+            <div class="action-icon-circle orange">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2M9 5a2 2 0 0 0 2 2h2a2 2 0 0 0 2-2M9 5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2m-6 9l2 2 4-4"/>
+                </svg>
+            </div>
+            <div class="action-text">
+                <div class="action-title">Proficiency</div>
+                <div class="action-sub">Test Level</div>
+            </div>
+        </a>
+        <a href="{{ url_for('word_bank') }}" class="action-card wordbank">
+            <div class="action-icon-circle green">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path>
+                    <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path>
+                </svg>
+            </div>
+            <div class="action-text">
+                <div class="action-title">Word Bank</div>
+                <div class="action-sub">Review ({{ word_bank_count }})</div>
+            </div>
+        </a>
+    </div>
+
+    <!-- Settings Sections -->
+    <div class="settings-container">
+        <!-- Companion Persona -->
+        <div class="setting-group-card">
+            <div class="setting-header">
+                <div class="setting-icon-bg green-icon">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+                </div>
+                <div class="setting-info">
+                    <div class="setting-name">Companion Persona</div>
+                    <div class="setting-desc">Define character & tone</div>
+                </div>
+                <div class="setting-chevron">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#ccc" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                </div>
+            </div>
+            <div class="setting-content">
+                <textarea id="roleDefinition" class="clean-textarea" rows="3" placeholder="Enter role definition">{{ profile.role_definition }}</textarea>
+                <div class="char-count">124 / 500</div>
+            </div>
+        </div>
+
+        <!-- Voice Pack -->
+        <div class="setting-group-card collapsed">
+            <div class="setting-header">
+                <div class="setting-icon-bg green-icon">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line x1="12" y1="19" x2="12" y2="23"></line><line x1="8" y1="23" x2="16" y2="23"></line></svg>
+                </div>
+                <div class="setting-info">
+                    <div class="setting-name">Voice Pack</div>
+                    <div class="setting-desc">Selected: <span id="currentVoiceName">Default</span></div>
+                </div>
+                <div class="setting-chevron">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#ccc" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                </div>
+            </div>
+            <div class="setting-content">
+                 <select id="voicePackSelect" class="clean-select"></select>
+                 <div style="margin-top:10px; display:flex; gap:10px;">
+                    <button class="mini-btn" id="voiceTestBtn">▶ Speak Sample</button>
+                    <span id="ttsStatusLabel" class="status-badge"></span>
+                 </div>
+            </div>
+        </div>
+
+        <!-- Preferences -->
+        <div class="setting-group-card collapsed">
+            <div class="setting-header">
+                <div class="setting-icon-bg green-icon">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="4" y1="21" x2="4" y2="14"></line><line x1="4" y1="10" x2="4" y2="3"></line><line x1="12" y1="21" x2="12" y2="12"></line><line x1="12" y1="8" x2="12" y2="3"></line><line x1="20" y1="21" x2="20" y2="16"></line><line x1="20" y1="12" x2="20" y2="3"></line><line x1="1" y1="14" x2="7" y2="14"></line><line x1="9" y1="8" x2="15" y2="8"></line><line x1="17" y1="16" x2="23" y2="16"></line></svg>
+                </div>
+                <div class="setting-info">
+                    <div class="setting-name">Preferences</div>
+                    <div class="setting-desc">Topic focus & difficulty</div>
+                </div>
+                <div class="setting-chevron">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#ccc" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                </div>
+            </div>
+            <div class="setting-content">
+                <div class="pref-row">
+                    <label>Difficulty</label>
+                    <select id="prefDifficulty" class="clean-select">
+                        <option value="easy" {% if profile.learning_preference.difficulty == 'easy' %}selected{% endif %}>Easy</option>
+                        <option value="medium" {% if profile.learning_preference.difficulty == 'medium' %}selected{% endif %}>Medium</option>
+                        <option value="hard" {% if profile.learning_preference.difficulty == 'hard' %}selected{% endif %}>Hard</option>
+                    </select>
+                </div>
+                <div class="pref-row">
+                    <label>Target Level</label>
+                    <select id="prefTargetLevel" class="clean-select">
+                        <option value="A2" {% if profile.learning_preference.target_level == 'A2' %}selected{% endif %}>A2</option>
+                        <option value="B1" {% if profile.learning_preference.target_level == 'B1' %}selected{% endif %}>B1</option>
+                        <option value="B2" {% if profile.learning_preference.target_level == 'B2' %}selected{% endif %}>B2</option>
+                        <option value="C1" {% if profile.learning_preference.target_level == 'C1' %}selected{% endif %}>C1</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <!-- Account -->
+        <div class="setting-group-card collapsed">
+            <div class="setting-header">
+                <div class="setting-icon-bg green-icon">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
+                </div>
+                <div class="setting-info">
+                    <div class="setting-name">Account</div>
+                    <div class="setting-desc">Security & subscriptions</div>
+                </div>
+                <div class="setting-chevron">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#ccc" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                </div>
+            </div>
+            <div class="setting-content">
+                <div class="pref-row">
+                    <label>Notifications</label>
+                    <label class="switch">
+                        <input type="checkbox" id="notifSwitch" {% if profile.notifications %}checked{% endif %}>
+                        <span class="slider round"></span>
+                    </label>
+                </div>
+                <div class="pref-row">
+                    <label>Privacy</label>
+                    <button class="mini-btn" id="privacyBtn">Manage</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="bottom-space"></div>
+</div>
+
+<script>
+    // Toggle Accordion
+    document.querySelectorAll('.setting-header').forEach(header => {
+        header.addEventListener('click', () => {
+            const card = header.parentElement;
+            card.classList.toggle('collapsed');
+        });
+    });
+
+    // Avatar Logic
+    const avatarBtn = document.getElementById('avatarBtn');
+    const avatarInput = document.getElementById('avatarInput');
+    avatarBtn.addEventListener('click', () => avatarInput.click());
+    avatarInput.addEventListener('change', () => {
+        if (!avatarInput.files || !avatarInput.files.length) return;
+        const fd = new FormData();
+        fd.append('file', avatarInput.files[0]);
+        fetch('{{ url_for("profile_avatar_upload") }}', { method: 'POST', body: fd })
+            .then(res => res.json())
+            .then(data => {
+                if (data.ok) {
+                    const img = document.getElementById('profileAvatarImg');
+                    img.src = data.url;
+                }
+            });
+    });
+
+    function saveProfile(payload) {
+        fetch('{{ url_for("profile_update") }}', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.level_up) {
+                alert("🎉 Congratulations! You leveled up!");
+                location.reload();
+            }
+        });
+    }
+
+    // Name Edit Logic
+    const nameContainer = document.querySelector('.profile-name-container');
+    const nameDisplay = document.getElementById('nicknameDisplay');
+    const nameInput = document.getElementById('nicknameInput');
+    const editNameBtn = document.getElementById('editNameBtn');
+
+    function toggleNameEdit() {
+        const isEditing = nameInput.style.display !== 'none';
+        if (isEditing) {
+            // Save
+            const newName = nameInput.value.trim();
+            if (newName && newName !== nameDisplay.textContent) {
+                nameDisplay.textContent = newName;
+                saveProfile({ nickname: newName });
+            }
+            nameInput.style.display = 'none';
+            nameDisplay.style.display = 'block';
+            editNameBtn.style.opacity = '0.5';
+        } else {
+            // Edit
+            nameInput.style.display = 'block';
+            nameDisplay.style.display = 'none';
+            nameInput.focus();
+            editNameBtn.style.opacity = '1';
+        }
+    }
+
+    editNameBtn.addEventListener('click', toggleNameEdit);
+    
+    nameInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+            toggleNameEdit();
+        }
+    });
+    
+    nameInput.addEventListener('blur', () => {
+        // Slight delay to allow click on button to fire if needed
+        setTimeout(() => {
+            if (nameInput.style.display !== 'none') {
+                toggleNameEdit();
+            }
+        }, 200);
+    });
+
+    // Role Definition
+    document.getElementById('roleDefinition').addEventListener('change', (e) => {
+        saveProfile({ role_definition: e.target.value });
+    });
+    
+    // Preferences
+    document.getElementById('prefDifficulty').addEventListener('change', (e) => {
+        saveProfile({ learning_preference: { difficulty: e.target.value } });
+    });
+    document.getElementById('prefTargetLevel').addEventListener('change', (e) => {
+        saveProfile({ learning_preference: { target_level: e.target.value } });
+    });
+
+    // Notifications
+    document.getElementById('notifSwitch').addEventListener('change', (e) => {
+        saveProfile({ notifications: e.target.checked });
+    });
+
+    document.getElementById('privacyBtn').addEventListener('click', () => {
+        alert('Privacy settings placeholder.');
+    });
+
+    // Voice Pack Logic
+    (function(){
+        const sel = document.getElementById('voicePackSelect');
+        const btn = document.getElementById('voiceTestBtn');
+        const label = document.getElementById('ttsStatusLabel');
+        const currentName = document.getElementById('currentVoiceName');
+        
+        if (!sel) return;
+        
+        fetch('/voice_packs').then(r=>r.json()).then(d=>{
+            const items = (d && d.items) || [];
+            items.forEach(it=>{
+                const opt = document.createElement('option');
+                opt.value = it.id;
+                opt.textContent = it.name;
+                sel.appendChild(opt);
+            });
+            fetch('/profile_voice').then(r=>r.json()).then(p=>{
+                const val = p.model || items[0]?.id || 'piper_zh';
+                sel.value = val;
+                // Update label text
+                const selectedOption = sel.options[sel.selectedIndex];
+                if (selectedOption && currentName) currentName.textContent = selectedOption.text;
+            }).catch(()=>{});
+        });
+        
+        sel.addEventListener('change', ()=>{
+            saveProfile({ voice: { model: sel.value } });
+            const selectedOption = sel.options[sel.selectedIndex];
+            if (selectedOption && currentName) currentName.textContent = selectedOption.text;
+        });
+        
+        if (btn) btn.addEventListener('click', (e)=>{
+            e.stopPropagation(); // Prevent accordion toggle
+            const text = 'This is a sample of your current voice package. Hello!';
+            if (window.speakWithProfile) window.speakWithProfile(text);
+            else {
+                const utter = new SpeechSynthesisUtterance(text);
+                window.speechSynthesis.cancel();
+                window.speechSynthesis.speak(utter);
+            }
+        });
+    })();
+</script>
+{% endblock %}

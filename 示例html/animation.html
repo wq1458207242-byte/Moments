@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Magic Encapsulation V2: Sticker Metamorphosis</title>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Spline+Sans:wght@300;400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#f0a742",
+                        "background-light": "#f8f7f6",
+                        "background-dark": "#221a10",
+                    },
+                    fontFamily: {
+                        "display": ["Spline Sans", "sans-serif"]
+                    },
+                    borderRadius: {"DEFAULT": "1rem", "lg": "2rem", "xl": "3rem", "full": "9999px"},
+                    boxShadow: {
+                        'glow': '0 0 20px 5px rgba(240, 167, 66, 0.4)',
+                        'sticker': '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
+                    }
+                },
+            },
+        }
+    </script>
+<style>
+        /* Custom utilities for specific design needs */
+        .bg-paper-pattern {
+            background-image: radial-gradient(#e5e5e5 1px, transparent 1px);
+            background-size: 20px 20px;
+        }
+        .dark .bg-paper-pattern {
+            background-image: radial-gradient(#333 1px, transparent 1px);
+        }
+        
+        /* Simulating the "Float" state without animation for the static design */
+        .sticker-float {
+            transform: rotate(-3deg) scale(0.95);
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background-light dark:bg-background-dark font-display h-screen w-full overflow-hidden flex flex-col relative text-[#181511] dark:text-gray-100 selection:bg-primary/30">
+<!-- Background Pattern Texture -->
+<div class="absolute inset-0 bg-paper-pattern opacity-40 pointer-events-none z-0"></div>
+<!-- Header -->
+<header class="relative z-10 flex items-center justify-between p-4 pt-12 md:pt-6">
+<button class="flex items-center justify-center w-10 h-10 rounded-full bg-white/50 dark:bg-black/20 hover:bg-white dark:hover:bg-black/40 backdrop-blur-sm transition-colors text-[#181511] dark:text-white">
+<span class="material-symbols-outlined text-xl">arrow_back</span>
+</button>
+<div class="px-3 py-1 rounded-full bg-white/50 dark:bg-black/20 backdrop-blur-sm">
+<span class="text-xs font-semibold tracking-wide uppercase opacity-60">Magic Mode</span>
+</div>
+<button class="flex items-center justify-center w-10 h-10 rounded-full bg-white/50 dark:bg-black/20 hover:bg-white dark:hover:bg-black/40 backdrop-blur-sm transition-colors text-[#181511] dark:text-white">
+<span class="material-symbols-outlined text-xl">more_horiz</span>
+</button>
+</header>
+<!-- Main Content Area: The Metamorphosis Stage -->
+<main class="relative z-10 flex-1 flex flex-col items-center justify-center w-full px-6 pb-20">
+<!-- The Floating Sticker Container -->
+<div class="relative group perspective-1000">
+<!-- Sparkles/Particles (Simulated CSS positioning) -->
+<div class="absolute -top-8 -right-6 text-primary animate-pulse" style="animation-duration: 2s;">
+<span class="material-symbols-outlined text-4xl" style="font-variation-settings: 'FILL' 1;">star</span>
+</div>
+<div class="absolute -bottom-4 -left-8 text-primary/60 animate-pulse" style="animation-duration: 3s;">
+<span class="material-symbols-outlined text-2xl" style="font-variation-settings: 'FILL' 1;">spark</span>
+</div>
+<div class="absolute top-1/2 -right-12 text-primary/40">
+<span class="material-symbols-outlined text-xl">auto_awesome</span>
+</div>
+<!-- The Sticker Element -->
+<div class="relative sticker-float transition-all duration-500 ease-out">
+<!-- Sticker Border & Glow -->
+<div class="absolute inset-[-12px] bg-white dark:bg-gray-200 rounded-xl shadow-glow -z-10 rotate-1"></div>
+<!-- The Photo Itself -->
+<div class="w-64 h-80 sm:w-72 sm:h-96 rounded-lg overflow-hidden bg-gray-200 relative shadow-sticker transform rotate-[-1deg]">
+<div class="absolute inset-0 bg-cover bg-center" data-alt="A happy moment captured in a park with sunlight filtering through trees" style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuApnm-iD1IQjK07sionxsEIIZu_s83pgc5ySAjzVEfNaVrbHsJxMUpc9eYcg1L7lSiyrzfz_2M4wM1qI6jjxgnrTxHDtT8Sh37lg1MleOls_m97eYKMlSh3hH0LSng10q3lEv173TcYN9MJuKUnWv1wHQRp5GDC2_Zx3G70wZRo-ha4sFGr173IwlGC7dWNf88K043yB5uyLQjIG4phTlgnoFNbBD3Cvheg7wRRMxhSQRzKOetJBLFgCP5hA5cN-njAndQgnWsZl1bb');"></div>
+<!-- Subtle overlay to simulate print texture -->
+<div class="absolute inset-0 bg-gradient-to-tr from-orange-100/10 to-transparent mix-blend-overlay pointer-events-none"></div>
+</div>
+<!-- Spirit Blob Character (Overlaid) -->
+<!-- Positioned as if it just nudged the sticker from the left -->
+<div class="absolute -bottom-10 -left-12 w-24 h-24 sm:w-32 sm:h-32 z-20">
+<div class="w-full h-full relative">
+<!-- Blob Body Shape -->
+<div class="absolute inset-0 bg-gradient-to-br from-primary via-orange-300 to-orange-400 rounded-full opacity-90 blur-[1px] transform scale-110"></div>
+<div class="absolute inset-2 bg-gradient-to-tl from-orange-500 to-yellow-300 rounded-[40%_60%_70%_30%/40%_50%_60%_50%] shadow-lg flex items-center justify-center">
+<!-- Blob Face -->
+<div class="flex gap-3 mt-2">
+<div class="w-2 h-3 bg-black/80 rounded-full"></div>
+<div class="w-2 h-3 bg-black/80 rounded-full"></div>
+</div>
+<!-- Blush -->
+<div class="absolute top-1/2 left-3 w-3 h-2 bg-pink-400/50 rounded-full blur-sm"></div>
+<div class="absolute top-1/2 right-3 w-3 h-2 bg-pink-400/50 rounded-full blur-sm"></div>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Status & Context -->
+<div class="mt-16 flex flex-col items-center space-y-4 text-center z-20">
+<h2 class="text-3xl font-bold tracking-tight text-[#181511] dark:text-white">
+                Hang tight!
+            </h2>
+<div class="flex flex-col items-center gap-2">
+<p class="text-gray-500 dark:text-gray-400 max-w-xs text-base font-normal leading-relaxed">
+                    The Spirit Blob is adding some magic to your photo...
+                </p>
+</div>
+</div>
+</main>
+<!-- Bottom Action/Progress Area -->
+<div class="relative z-10 w-full p-6 pb-8 bg-gradient-to-t from-background-light via-background-light to-transparent dark:from-background-dark dark:via-background-dark">
+<div class="w-full max-w-md mx-auto">
+<!-- Progress Pill -->
+<div class="bg-white dark:bg-[#2c2419] rounded-full p-2 pl-4 pr-2 shadow-sm border border-gray-100 dark:border-white/5 flex items-center justify-between gap-3">
+<div class="flex items-center gap-3 overflow-hidden">
+<div class="w-5 h-5 rounded-full border-2 border-primary/30 border-t-primary animate-spin"></div>
+<span class="text-sm font-medium text-primary truncate">Crafting your memory...</span>
+</div>
+<button class="bg-gray-100 dark:bg-white/10 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 rounded-full p-2 transition-colors">
+<span class="material-symbols-outlined text-lg">close</span>
+</button>
+</div>
+</div>
+</div>
+</body></html>

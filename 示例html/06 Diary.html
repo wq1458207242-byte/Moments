@@ -1,0 +1,641 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Diary App with Word Card</title>
+    <style>
+        :root {
+            --primary-purple: #7b7bfe;
+            --primary-orange: #ff6b35; /* Word card orange */
+            --text-dark: #333;
+            --text-gray: #666;
+            --bg-gray: #f5f5f7;
+            --card-radius: 16px;
+            --shadow: 0 4px 12px rgba(0,0,0,0.08);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        }
+
+        body {
+            background-color: #e0e0e0;
+            display: flex;
+            justify-content: center;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        /* App Container */
+        .app-container {
+            width: 100%;
+            max-width: 414px; /* iPhone Max width */
+            background-color: #fff;
+            height: 100%;
+            position: relative;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 0 20px rgba(0,0,0,0.1);
+        }
+
+        /* Status Bar */
+        .status-bar {
+            height: 44px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 20px;
+            font-size: 14px;
+            font-weight: 600;
+            background: #fff;
+            z-index: 10;
+            flex-shrink: 0;
+        }
+
+        /* Header */
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 15px;
+            border-bottom: 1px solid #f0f0f0;
+            background: #fff;
+            z-index: 10;
+            flex-shrink: 0;
+        }
+
+        .back-btn { font-size: 24px; color: #666; cursor: pointer; }
+        
+        .tabs {
+            display: flex;
+            gap: 15px;
+            font-size: 16px;
+            font-weight: 600;
+        }
+        
+        .tab { color: #ccc; cursor: pointer; transition: color 0.3s; }
+        .tab.active { color: var(--primary-purple); }
+        
+        .date-share {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            color: var(--primary-purple);
+            font-weight: 500;
+        }
+
+        /* Scrollable Content */
+        .content-scroll {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+            padding-bottom: 80px;
+            scroll-behavior: smooth;
+        }
+
+        /* Sections */
+        .section-wrapper {
+            scroll-margin-top: 10px; /* Offset for smooth scroll landing */
+        }
+
+        .section-header {
+            color: var(--primary-purple);
+            font-size: 18px;
+            font-weight: 700;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-top: 10px;
+        }
+
+        .section-text {
+            font-size: 14px;
+            line-height: 1.5;
+            color: var(--text-dark);
+            margin-bottom: 15px;
+            text-align: justify;
+        }
+
+        .edit-icon {
+            cursor: pointer;
+            font-size: 20px;
+            color: #999;
+            transition: color 0.2s;
+        }
+        .edit-icon:hover { color: var(--primary-purple); }
+
+        /* Images & Tags */
+        .image-card {
+            width: 100%;
+            height: 220px;
+            border-radius: var(--card-radius);
+            margin-bottom: 20px;
+            position: relative;
+            overflow: hidden;
+            box-shadow: var(--shadow);
+            background-size: cover;
+            background-position: center;
+        }
+
+        .img-tennis {
+            background-image: url('https://images.unsplash.com/photo-1626245969038-d621b4431718?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80');
+        }
+
+        .img-burger {
+            height: 200px;
+            background-image: url('https://images.unsplash.com/photo-1568901346375-23c9450c58cd?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80');
+            border: 4px solid #fff;
+            transform: rotate(-2deg);
+            margin-top: 20px;
+        }
+
+        /* Interactive Tags */
+        .tag {
+            position: absolute;
+            background: rgba(255, 255, 255, 0.95);
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+            color: #e65100;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.1s;
+            z-index: 5;
+        }
+        
+        .tag:active { transform: scale(0.95); }
+
+        .tag.double {
+            flex-direction: row;
+            border-radius: 12px;
+            padding: 4px 10px;
+        }
+        
+        .tag-texts {
+            display: flex;
+            flex-direction: column;
+            line-height: 1;
+        }
+        .tag-top { font-size: 10px; color: #d84315; margin-bottom: 2px;}
+        .tag-bot { font-size: 12px; color: #00897b; }
+
+        /* Letter Section */
+        .letter-sub {
+            font-size: 12px;
+            font-family: 'Courier New', Courier, monospace;
+            color: #666;
+            margin-bottom: 15px;
+        }
+        
+        .floating-btn {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            width: 60px;
+            height: 60px;
+            background: #d1e7f3;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #7b7bfe;
+            font-weight: bold;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.15);
+            cursor: pointer;
+            z-index: 50;
+        }
+
+        /* ====================
+           WORD CARD MODAL
+           ==================== */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.6);
+            z-index: 200;
+            display: none;
+            justify-content: center;
+            align-items: center;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        .modal-overlay.active {
+            display: flex;
+            opacity: 1;
+        }
+
+        .word-card {
+            width: 90%;
+            max-width: 360px;
+            background: #fff;
+            border-radius: 20px;
+            padding: 25px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            position: relative;
+            transform: translateY(20px);
+            transition: transform 0.3s;
+        }
+
+        .modal-overlay.active .word-card {
+            transform: translateY(0);
+        }
+
+        .wc-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 20px;
+        }
+
+        .wc-title {
+            font-family: Georgia, 'Times New Roman', serif;
+            font-size: 42px;
+            color: var(--primary-orange);
+            line-height: 1;
+            margin-bottom: 5px;
+        }
+
+        .wc-phonetic {
+            color: #999;
+            font-size: 14px;
+            font-family: sans-serif;
+        }
+
+        .heart-icon {
+            font-size: 24px;
+            color: #999;
+            cursor: pointer;
+        }
+
+        .wc-definition {
+            font-size: 16px;
+            color: #333;
+            margin-bottom: 25px;
+            line-height: 1.6;
+        }
+        .wc-definition b { font-weight: 600; }
+
+        .wc-section-title {
+            color: var(--primary-orange);
+            font-size: 14px;
+            margin-bottom: 8px;
+            margin-top: 20px;
+        }
+
+        .wc-example-en {
+            font-size: 15px;
+            color: #333;
+            font-weight: 600;
+            line-height: 1.4;
+            margin-bottom: 5px;
+        }
+
+        .wc-example-cn {
+            font-size: 14px;
+            color: #666;
+            margin-bottom: 15px;
+        }
+
+        /* ====================
+           EDIT VIEW
+           ==================== */
+        .edit-view {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #fff;
+            z-index: 100;
+            display: none;
+            flex-direction: column;
+            animation: slideUp 0.3s ease-out;
+        }
+
+        @keyframes slideUp {
+            from { transform: translateY(100%); }
+            to { transform: translateY(0); }
+        }
+
+        .edit-content {
+            padding: 20px;
+            flex: 1;
+            overflow-y: auto;
+            background: #f9f9f9;
+        }
+
+        .suggestion-label {
+            display: flex;
+            justify-content: space-between;
+            font-size: 12px;
+            color: #666;
+            margin-bottom: 10px;
+            font-weight: 600;
+            border-left: 3px solid #ff7043;
+            padding-left: 8px;
+        }
+
+        .suggestion-box {
+            background: #fff;
+            padding: 12px;
+            border-radius: 8px;
+            font-size: 13px;
+            color: #444;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+            margin-bottom: 10px;
+            border: 1px solid #eee;
+        }
+
+        .text-editor-area {
+            background: #fff;
+            border-radius: 12px;
+            padding: 15px;
+            font-size: 15px;
+            line-height: 1.6;
+            color: #333;
+            border: 1px solid #ddd;
+            height: 220px;
+            margin-top: 10px;
+            box-shadow: inset 0 2px 4px rgba(0,0,0,0.02);
+            font-family: inherit;
+            width: 100%;
+            resize: none;
+        }
+        
+        .text-editor-area:focus { outline: none; border-color: var(--primary-purple); }
+
+        .keyboard {
+            background: #d1d4d9;
+            padding: 8px 3px 20px 3px;
+        }
+
+        .kb-row { display: flex; justify-content: center; margin-bottom: 8px; gap: 6px; }
+        .key {
+            background: #fff; border-radius: 5px; height: 42px; flex: 1;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 20px; box-shadow: 0 1px 0 #888; color: #000;
+            max-width: 32px;
+        }
+        .key.wide { flex: 1.5; max-width: 45px; background: #acb3bc; }
+        .key.space { flex: 4; max-width: 200px; }
+        .key.blue { background: #007aff; color: white; font-size: 16px; }
+
+    </style>
+</head>
+<body>
+
+    <div class="app-container">
+        <!-- Status Bar -->
+        <div class="status-bar">
+            <span>9:41</span>
+            <span>📶 🔋</span>
+        </div>
+
+        <!-- Header -->
+        <div class="header">
+            <div class="back-btn" id="main-back">←</div>
+            <div class="tabs">
+                <span class="tab active" data-target="moments" id="tab-moments">Moments</span>
+                <span class="tab" data-target="diary" id="tab-diary">Diary</span>
+                <span class="tab" data-target="letter" id="tab-letter">Letter</span>
+            </div>
+            <div class="date-share">
+                January 31st 
+                <span style="color:#999; font-size: 18px;">⎋</span>
+            </div>
+        </div>
+
+        <!-- VIEW 1: SCROLLABLE FEED -->
+        <div class="content-scroll" id="scroll-container">
+            
+            <!-- Moments Section -->
+            <div id="moments" class="section-wrapper">
+                <div class="section-header">Moments</div>
+                <p class="section-text">
+                    A sunny day for tennis! I love the vibrant green of my racket and balls. Ready for a good game. Taking a quick break on the court...
+                </p>
+
+                <div class="image-card img-tennis">
+                    <!-- WORD CARD TRIGGER -->
+                    <div class="tag" id="btn-tennis-tag" style="top: 40%; left: 30%;">
+                        <span>🎾</span> Tennis
+                    </div>
+                    
+                    <div class="tag" style="bottom: 20%; right: 10%;">
+                        <span>🎾</span> Court
+                    </div>
+                </div>
+
+                <!-- Food Section -->
+                <div class="image-card img-burger">
+                    <div class="tag double" style="top: 30%; left: 45%;">
+                        <span>📍</span>
+                        <div class="tag-texts">
+                            <span class="tag-top">Hamburguesa</span>
+                            <span class="tag-bot">Burger</span>
+                        </div>
+                    </div>
+                    <div class="tag double" style="bottom: 25%; left: 30%;">
+                        <span>★</span>
+                        <div class="tag-texts">
+                            <span class="tag-top">Delicioso</span>
+                            <span class="tag-bot">Delicious</span>
+                        </div>
+                    </div>
+                </div>
+
+                <p class="section-text" style="margin-top: 15px;">
+                    I just had a juicy beef burger for lunch. The bun was soft and slightly toasted, with melted cheese oozing out...
+                </p>
+            </div>
+
+            <hr style="border: 0; border-top: 1px solid #eee; margin: 20px 0;">
+
+            <!-- Diary Section -->
+            <div id="diary" class="section-wrapper">
+                <div class="section-header">
+                    Diary 
+                    <span class="edit-icon" id="edit-btn">📝</span>
+                </div>
+                <p class="section-text" id="diary-display-text">
+                    Today was perfect for being outside. I started the morning at the tennis courts with my new green racket, playing for an hour in the bright sun. The crisp shadows on the court and the energetic game left me feeling alive.
+                </p>
+            </div>
+
+            <hr style="border: 0; border-top: 1px solid #eee; margin: 20px 0;">
+
+            <!-- Letter Section -->
+            <div id="letter" class="section-wrapper">
+                <div class="section-header" style="color:#7b7bfe">Dear iducle:</div>
+                <div class="letter-sub">✨ A letter from Your AI Elf Pet</div>
+                <p class="section-text">
+                    Today I perched on your shoulder and had the best day ever with you!
+                    <br><br>
+                    This morning at the tennis court, I watched you run around with your bright green racket. The sun made your shadow stretch long...
+                </p>
+                <!-- Add more space for scrolling -->
+                <div style="height: 50px;"></div>
+            </div>
+        </div>
+
+        <!-- Floating Button -->
+        <div class="floating-btn">OwO</div>
+
+        <!-- WORD CARD POPUP (NEW) -->
+        <div class="modal-overlay" id="word-card-overlay">
+            <div class="word-card" id="word-card-content">
+                <div class="wc-header">
+                    <div>
+                        <div class="wc-title">Tennis</div>
+                        <div class="wc-phonetic">美: ['tenIs] 英: ['tenIs]</div>
+                    </div>
+                    <div class="heart-icon">♡</div>
+                </div>
+
+                <div class="wc-definition">
+                    <b>n. 网球</b><br>
+                    网球运动 ; 网球鞋 ; 网球杂志
+                </div>
+
+                <div class="wc-section-title">基于你水平的例句 :</div>
+                <div class="wc-example-en">
+                    I wasn't necessarily playing my best tennis the whole way throughout, but I served well when I needed to and I chased the ball down.
+                </div>
+                <div class="wc-example-cn">
+                    我从没打过网球，但我要试试，看看我行不行。
+                </div>
+
+                <div class="wc-section-title" style="margin-top: 15px;">基于场景的例句 :</div>
+                <div class="wc-example-en">
+                    I wasn't necessarily playing my best tennis the whole way throughout
+                </div>
+            </div>
+        </div>
+
+        <!-- VIEW 2: EDIT OVERLAY -->
+        <div class="edit-view" id="edit-view">
+            <div class="header">
+                <div class="back-btn" id="edit-back">←</div>
+                <div class="tabs">
+                    <span class="tab">Moments</span>
+                    <span class="tab active" style="color:var(--primary-purple)">Diary</span>
+                    <span class="tab">Letter</span>
+                </div>
+                <div class="date-share">January 31st ⎋</div>
+            </div>
+            <div class="section-header" style="padding: 15px 20px 0;">
+                Diary <span class="edit-icon">📝</span>
+            </div>
+            <div class="edit-content">
+                <div class="suggestion-label">
+                    The sentence you might wanna use:
+                    <span style="background:#eee; padding:2px 8px; border-radius:10px; font-weight:normal;">Want more?</span>
+                </div>
+                <div class="suggestion-box">It was a simple, satisfying day full of small, happy moments.</div>
+                <div class="suggestion-box">It was a simple day, but it was exactly what I needed—active...</div>
+                <textarea class="text-editor-area" id="diary-input"></textarea>
+            </div>
+            <div class="keyboard">
+                <div class="kb-row"><div class="key">Q</div><div class="key">W</div><div class="key">E</div><div class="key">R</div><div class="key">T</div><div class="key">Y</div><div class="key">U</div><div class="key">I</div><div class="key">O</div><div class="key">P</div></div>
+                <div class="kb-row" style="padding: 0 10px;"><div class="key">A</div><div class="key">S</div><div class="key">D</div><div class="key">F</div><div class="key">G</div><div class="key">H</div><div class="key">J</div><div class="key">K</div><div class="key">L</div></div>
+                <div class="kb-row"><div class="key wide">⬆</div><div class="key">Z</div><div class="key">X</div><div class="key">C</div><div class="key">V</div><div class="key">B</div><div class="key">N</div><div class="key">M</div><div class="key wide">⌫</div></div>
+                <div class="kb-row"><div class="key wide">123</div><div class="key space">space</div><div class="key wide blue" id="kb-return">return</div></div>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        /* === TAB NAVIGATION (Quick Jump) === */
+        const tabs = document.querySelectorAll('.tab');
+        const scrollContainer = document.getElementById('scroll-container');
+        
+        // Map data-targets to IDs
+        tabs.forEach(tab => {
+            tab.addEventListener('click', () => {
+                const targetId = tab.getAttribute('data-target');
+                if(!targetId) return; // Ignore tabs in edit view for now or handle similarly
+
+                const targetSection = document.getElementById(targetId);
+                
+                // Switch Active Style
+                document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+                tab.classList.add('active');
+                
+                // Specific fix for "Moments" tab inside edit view
+                if(document.getElementById('edit-view').style.display === 'flex') {
+                    // Logic for switching tabs inside edit view (optional), 
+                    // current request implies main view jumping.
+                }
+
+                if (targetSection) {
+                    targetSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }
+            });
+        });
+
+        /* === WORD CARD INTERACTION === */
+        const tennisTag = document.getElementById('btn-tennis-tag');
+        const wordCardOverlay = document.getElementById('word-card-overlay');
+        const wordCardContent = document.getElementById('word-card-content');
+
+        // Open Modal
+        tennisTag.addEventListener('click', (e) => {
+            e.stopPropagation(); // Prevent bubbling
+            wordCardOverlay.classList.add('active');
+        });
+
+        // Close Modal when clicking outside the card
+        wordCardOverlay.addEventListener('click', (e) => {
+            if (e.target === wordCardOverlay) {
+                wordCardOverlay.classList.remove('active');
+            }
+        });
+
+        // Prevent closing when clicking inside the card
+        wordCardContent.addEventListener('click', (e) => {
+            e.stopPropagation();
+        });
+
+
+        /* === EDIT MODE LOGIC (From previous) === */
+        const editBtn = document.getElementById('edit-btn');
+        const editView = document.getElementById('edit-view');
+        const editBack = document.getElementById('edit-back');
+        const kbReturn = document.getElementById('kb-return');
+        const diaryDisplay = document.getElementById('diary-display-text');
+        const diaryInput = document.getElementById('diary-input');
+        const initialText = "Today was perfect for being outside. I started the morning at the tennis courts with my new green racket, playing for an hour in the bright sun. The crisp shadows on the court and the energetic game left me feeling alive. I paused for a quick break with an iced sports drink to cool down.\n\nBy lunch, I was starving and headed to a nearby café for a juicy beef burger.";
+
+        diaryDisplay.innerText = initialText;
+
+        editBtn.addEventListener('click', () => {
+            diaryInput.value = diaryDisplay.innerText;
+            editView.style.display = 'flex';
+        });
+
+        function closeEdit() {
+            diaryDisplay.innerText = diaryInput.value;
+            editView.style.display = 'none';
+        }
+
+        editBack.addEventListener('click', closeEdit);
+        kbReturn.addEventListener('click', closeEdit);
+
+    </script>
+</body>
+</html>

@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Moments - Vocab Scan</title>
+    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700&family=Patrick+Hand&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-cream: #FDFBF7;
+            --sage-green: #8EB897;
+            --sage-dark: #6A8F72;
+            --soft-orange: #FF9F76;
+            --text-dark: #2C3E50;
+            --card-shadow: 0 4px 20px rgba(142, 184, 151, 0.15);
+        }
+
+        body {
+            font-family: 'Nunito', sans-serif;
+            background-color: var(--bg-cream);
+            color: var(--text-dark);
+            display: flex;
+            justify-content: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 400px;
+            position: relative;
+        }
+
+        /* Header */
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            margin-top: 20px;
+        }
+
+        .mascot {
+            font-size: 40px;
+            margin-bottom: 10px;
+            animation: bounce 2s infinite;
+            display: inline-block;
+        }
+
+        h1 {
+            font-size: 24px;
+            color: var(--sage-dark);
+            margin-bottom: 8px;
+        }
+
+        p.subtitle {
+            font-size: 14px;
+            color: #666;
+            max-width: 80%;
+            margin: 0 auto;
+        }
+
+        /* Word Grid */
+        .word-grid {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            justify-content: center;
+            padding-bottom: 100px; /* Space for fixed button */
+        }
+
+        .word-chip {
+            background: #fff;
+            border: 2px solid #EFEFEF;
+            border-radius: 16px;
+            padding: 10px 16px;
+            font-family: 'Patrick Hand', cursive; /* 手写体 */
+            font-size: 18px;
+            cursor: pointer;
+            transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            user-select: none;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+        }
+
+        /* 选中状态：变成绿色，像贴纸一样 */
+        .word-chip.selected {
+            background-color: var(--sage-green);
+            border-color: var(--sage-green);
+            color: white;
+            transform: scale(1.05) rotate(-2deg);
+            box-shadow: 0 4px 12px rgba(142, 184, 151, 0.4);
+        }
+        
+        /* 偶数个稍微反向旋转，增加自然感 */
+        .word-chip.selected:nth-child(even) {
+            transform: scale(1.05) rotate(2deg);
+        }
+
+        /* Floating Action Button */
+        .fab-container {
+            position: fixed;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 90%;
+            max-width: 380px;
+            z-index: 10;
+        }
+
+        .btn-finish {
+            width: 100%;
+            background: var(--text-dark);
+            color: white;
+            border: none;
+            padding: 18px;
+            border-radius: 20px;
+            font-size: 18px;
+            font-weight: 700;
+            box-shadow: 0 10px 25px rgba(44, 62, 80, 0.3);
+            cursor: pointer;
+            transition: transform 0.2s;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .btn-finish:active {
+            transform: scale(0.98);
+        }
+
+        /* Result Modal */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            backdrop-filter: blur(5px);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 100;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        .modal-card {
+            background: var(--bg-cream);
+            width: 90%;
+            max-width: 360px;
+            border-radius: 32px;
+            padding: 30px;
+            text-align: center;
+            transform: translateY(20px);
+            transition: transform 0.3s;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.2);
+            border: 6px solid #fff;
+        }
+
+        .score-circle {
+            width: 120px;
+            height: 120px;
+            background: var(--sage-green);
+            border-radius: 50%;
+            margin: 0 auto 20px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            color: white;
+            box-shadow: inset 0 0 20px rgba(0,0,0,0.1);
+        }
+
+        .score-number {
+            font-size: 32px;
+            font-weight: 800;
+            line-height: 1;
+        }
+
+        .score-label {
+            font-size: 12px;
+            opacity: 0.9;
+        }
+
+        .level-badge {
+            background: var(--soft-orange);
+            color: white;
+            padding: 6px 16px;
+            border-radius: 20px;
+            font-weight: 700;
+            display: inline-block;
+            margin-bottom: 16px;
+            font-size: 14px;
+        }
+
+        .btn-start {
+            background: transparent;
+            border: 2px solid var(--text-dark);
+            color: var(--text-dark);
+            padding: 12px 24px;
+            border-radius: 12px;
+            font-weight: 700;
+            cursor: pointer;
+            margin-top: 20px;
+        }
+
+        @keyframes bounce {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-10px); }
+        }
+
+        /* 简单的庆祝动画 */
+        .confetti {
+            position: absolute;
+            width: 10px;
+            height: 10px;
+            background-color: #f00;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <div class="header">
+            <div class="mascot">👻</div>
+            <h1>Word Collection</h1>
+            <p class="subtitle">Tap the words you know to feed your spirit.</p>
+        </div>
+
+        <!-- 单词列表容器 -->
+        <div class="word-grid" id="wordContainer">
+            <!-- Words will be injected here by JS -->
+        </div>
+
+        <div class="fab-container">
+            <button class="btn-finish" onclick="calculateResult()">
+                <span>I'm done!</span>
+                <span id="counter" style="background:rgba(255,255,255,0.2); padding:2px 10px; border-radius:10px; font-size:14px;">0 collected</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- 结果弹窗 -->
+    <div class="modal-overlay" id="resultModal">
+        <div class="modal-card">
+            <h2 style="margin-bottom:20px; color:var(--text-dark);">Your Level</h2>
+            
+            <div class="score-circle">
+                <span class="score-number" id="vocabSize">0</span>
+                <span class="score-label">Words</span>
+            </div>
+
+            <div class="level-badge" id="cefrLevel">A1</div>
+            
+            <p style="font-size:14px; color:#666; line-height:1.5;">
+                You're ready to start capturing moments! Your AI companion has adjusted to your pace.
+            </p>
+
+            <button class="btn-start" onclick="closeModal()">Start Journey</button>
+        </div>
+    </div>
+
+    <script>
+        // 模拟词库：包含不同难度等级的词 (Level 1-5 对应 A1-C2)
+        // 实际开发中这个列表应该更长，且随机抽取
+        const wordDatabase = [
+            { text: "Apple", level: 1 }, { text: "Time", level: 1 }, { text: "Happy", level: 1 },
+            { text: "Friend", level: 1 }, { text: "Color", level: 1 }, { text: "Walk", level: 1 },
+            { text: "Weather", level: 2 }, { text: "Decide", level: 2 }, { text: "Journey", level: 2 },
+            { text: "Memory", level: 2 }, { text: "Simple", level: 2 }, { text: "Avoid", level: 2 },
+            { text: "Creative", level: 3 }, { text: "Solution", level: 3 }, { text: "Efficient", level: 3 },
+            { text: "Atmosphere", level: 3 }, { text: "Generous", level: 3 }, { text: "Hesitate", level: 3 },
+            { text: "Subtle", level: 4 }, { text: "Inevitable", level: 4 }, { text: "Profound", level: 4 },
+            { text: "Reluctant", level: 4 }, { text: "Allocate", level: 4 }, { text: "Diminish", level: 4 },
+            { text: "Ambiguous", level: 5 }, { text: "Eloquence", level: 5 }, { text: "Scrutinize", level: 5 },
+            { text: "Ubiquitous", level: 5 }, { text: "Ephemeral", level: 5 }, { text: "Pragmatic", level: 5 }
+        ];
+
+        let selectedCount = 0;
+        let selectedLevels = {1:0, 2:0, 3:0, 4:0, 5:0};
+
+        // 渲染单词
+        const container = document.getElementById('wordContainer');
+        
+        wordDatabase.forEach((item, index) => {
+            const chip = document.createElement('div');
+            chip.className = 'word-chip';
+            chip.innerText = item.text;
+            chip.dataset.level = item.level;
+            chip.onclick = function() { toggleWord(this, item.level); };
+            
+            // 随机一点动画延迟，让页面更有活力
+            chip.style.animationDelay = `${index * 0.05}s`;
+            
+            container.appendChild(chip);
+        });
+
+        function toggleWord(element, level) {
+            element.classList.toggle('selected');
+            
+            if (element.classList.contains('selected')) {
+                selectedCount++;
+                selectedLevels[level]++;
+            } else {
+                selectedCount--;
+                selectedLevels[level]--;
+            }
+            
+            document.getElementById('counter').innerText = selectedCount + " collected";
+        }
+
+        function calculateResult() {
+            // 简单的估算逻辑
+            // 实际算法可以根据 Levels 的加权平均数来计算
+            
+            let totalScore = 0;
+            // 权重：难词分更高
+            totalScore += selectedLevels[1] * 200;
+            totalScore += selectedLevels[2] * 400;
+            totalScore += selectedLevels[3] * 600;
+            totalScore += selectedLevels[4] * 1000;
+            totalScore += selectedLevels[5] * 1500;
+
+            // 基础分
+            let estimatedVocab = 500 + totalScore;
+            
+            // 限制最大最小值 (Mock logic)
+            if (selectedCount === 0) estimatedVocab = 0;
+            if (selectedCount === wordDatabase.length) estimatedVocab = 12000;
+
+            // 映射到 CEFR
+            let cefr = "A1";
+            if (estimatedVocab > 1500) cefr = "A2";
+            if (estimatedVocab > 3000) cefr = "B1";
+            if (estimatedVocab > 5000) cefr = "B2";
+            if (estimatedVocab > 8000) cefr = "C1";
+            if (estimatedVocab > 10000) cefr = "C2";
+
+            showModal(estimatedVocab, cefr);
+        }
+
+        function showModal(vocab, cefr) {
+            document.getElementById('vocabSize').innerText = vocab;
+            document.getElementById('cefrLevel').innerText = cefr;
+            
+            const modal = document.getElementById('resultModal');
+            modal.style.display = 'flex';
+            // Trigger reflow
+            void modal.offsetWidth;
+            modal.style.opacity = '1';
+        }
+        
+        function closeModal() {
+             alert("Settings saved! Entering the app...");
+        }
+    </script>
+</body>
+</html>

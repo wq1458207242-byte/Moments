@@ -1,0 +1,16 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<div style="padding: 20px;">
+    <h2 style="margin-bottom: 12px;">选择图片进行分析</h2>
+    <form action="{{ url_for('upload_file') }}" method="post" enctype="multipart/form-data">
+        <input type="file" name="file" accept="image/*" style="margin-bottom: 12px;" />
+        <div>
+            <button class="btn-done" type="submit">上传并分析</button>
+        </div>
+    </form>
+    <div style="margin-top:16px;">
+        <a href="{{ url_for('camera') }}" style="text-decoration:none;">返回相机页面</a>
+    </div>
+</div>
+{% endblock %}

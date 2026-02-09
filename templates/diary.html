@@ -1,0 +1,317 @@
+{% extends "layout.html" %}
+
+{% block content %}
+    <div class="header" style="display:flex; align-items:center; justify-content:space-between; padding:18px 16px;">
+        <a href="{{ url_for('index') }}" class="back-btn" style="text-decoration:none;">←</a>
+        <div style="display:flex; flex-direction:column; align-items:center;">
+            <div style="font-size:10px; font-weight:700; color:#2bee6c; text-transform:uppercase; letter-spacing:1.2px;">Daily Log</div>
+            <div style="font-size:18px; font-weight:800;">{{ date }}</div>
+        </div>
+        <button id="shareLongImg" class="save-btn" style="padding:8px 10px; border-radius:999px;">⎋</button>
+    </div>
+
+    <!-- VIEW 1: SCROLLABLE FEED -->
+    <div class="content-scroll" id="scroll-container">
+        
+        <!-- Moments Section -->
+        <div id="moments" class="section-wrapper">
+            <div style="display:flex; align-items:center; justify-content:space-between; padding:0 6px 12px;">
+                <div class="section-header">Your Moments</div>
+                <div class="badge-green">{{ photos_count }} Photos</div>
+            </div>
+            {% set extra = (moments|length - 3) if moments|length > 3 else 0 %}
+            <div style="position:relative; min-height: {{ 520 + (extra * 260) }}px;">
+                {% set m1 = moments[0] if moments|length >= 1 else None %}
+                {% set m2 = moments[1] if moments|length >= 2 else None %}
+                {% set m3 = moments[2] if moments|length >= 3 else None %}
+                {% if m1 %}
+                <div class="moment-wrapper" data-idx="1" style="position:absolute; top:0; left:8px; width:55%; z-index:10; transform:rotate(-2deg); transition:transform .25s, filter .25s;">
+                    <div style="background:#fff; border-radius:12px; box-shadow:0 8px 30px rgba(0,0,0,0.12); padding:12px 12px 16px;">
+                        <div class="image-card" style="aspect-ratio:4/5; border-radius:10px; margin-bottom:8px; background-image:url('{{ url_for('static', filename='uploads/' + m1.image) }}');"></div>
+                        <p class="section-text moment-caption" data-mid="{{ m1.id }}" style="font-size:12px; color:#666;">
+                            {{ (brief_map|default({})).get(m1.id) or m1.content }}
+                        </p>
+                        <div style="margin-top:8px; padding-top:8px; border-top:1px solid #f0f0f0; display:flex; align-items:center; gap:6px; font-size:10px; color:#9aa0a6;">
+                            <span>📍</span><span>{{ m1.display_date }}</span>
+                        </div>
+                    </div>
+                    <div class="tape-effect" style="position:absolute; top:-12px; left:50%; transform:translateX(-50%) rotate(2deg); width:64px; height:22px; opacity:0.85;"></div>
+                </div>
+                {% endif %}
+                {% if m2 %}
+                <div class="moment-wrapper" data-idx="2" style="position:absolute; top:48px; right:8px; width:45%; z-index:0; transform:rotate(3deg); transition:transform .25s, filter .25s;">
+                    <div style="background:#fff; border-radius:14px; border:4px solid #fff; box-shadow:0 8px 24px rgba(0,0,0,0.12); padding:8px 8px 12px;">
+                        <div class="image-card" style="aspect-ratio:1/1; border-radius:12px; margin-bottom:8px; background-image:url('{{ url_for('static', filename='uploads/' + m2.image) }}');"></div>
+                        <p class="section-text moment-caption" data-mid="{{ m2.id }}" style="font-size:10px; color:#666; padding:0 4px;">
+                            {{ (brief_map|default({})).get(m2.id) or m2.content }}
+                        </p>
+                    </div>
+                    <div style="position:absolute; bottom:-14px; right:-10px; background:#2bee6c; color:#0e1c12; font-weight:700; font-size:11px; padding:4px 8px; border-radius:999px; transform:rotate(12deg); box-shadow:0 2px 6px rgba(0,0,0,0.1); border:2px solid #fff; z-index:20;">
+                        So cute!
+                    </div>
+                </div>
+                {% endif %}
+                {% if m3 %}
+                <div class="moment-wrapper" data-idx="3" style="position:absolute; top:320px; left:50%; transform:translateX(-50%) rotate(-1deg); width:90%; z-index:20; transition:transform .25s, filter .25s;">
+                    <div style="background:#fff; border-radius:16px; box-shadow:0 10px 24px rgba(0,0,0,0.12); padding:12px;">
+                        <div class="image-card" style="aspect-ratio:16/9; border-radius:14px; position:relative; margin-bottom:10px; background-image:url('{{ url_for('static', filename='uploads/' + m3.image) }}');">
+                            <div style="position:absolute; inset:0; background:rgba(0,0,0,0.20);"></div>
+                            <div style="position:absolute; right:12px; bottom:10px; background:rgba(255,255,255,0.9); backdrop-filter:blur(4px); padding:6px 10px; border-radius:999px; font-size:11px; font-weight:700; color:#334155; box-shadow:0 2px 6px rgba(0,0,0,0.1); display:flex; align-items:center; gap:6px;">
+                                ☀️ {{ time_hint }}
+                            </div>
+                        </div>
+                        <p class="section-text" style="font-size:13px; color:#475569; padding:0 4px;">
+                            {{ (brief_map|default({})).get(m3.id) or m3.content }}
+                        </p>
+                    </div>
+                    <div class="tape-effect" style="position:absolute; top:-10px; right:36px; width:80px; height:18px; transform:rotate(-3deg); opacity:0.9;"></div>
+                    <div class="tape-effect" style="position:absolute; bottom:-10px; left:36px; width:64px; height:18px; transform:rotate(2deg); opacity:0.9;"></div>
+                </div>
+                {% endif %}
+                {% for m in moments[3:] %}
+                {% set idx = loop.index0 %}
+                <div class="moment-wrapper" data-idx="{{ idx + 4 }}" style="position:absolute; top: {{ 320 + (idx * 260) }}px; left:50%; transform:translateX(-50%) rotate({{ -1 if (loop.index is odd) else 1 }}deg); width:90%; z-index:20; transition:transform .25s, filter .25s;">
+                    <div style="background:#fff; border-radius:16px; box-shadow:0 10px 24px rgba(0,0,0,0.12); padding:12px;">
+                        <div class="image-card" style="aspect-ratio:16/9; border-radius:14px; position:relative; margin-bottom:10px; background-image:url('{{ url_for('static', filename='uploads/' + m.image) }}');"></div>
+                        <p class="section-text" style="font-size:13px; color:#475569; padding:0 4px;">
+                            {{ (brief_map|default({})).get(m.id) or m.content }}
+                        </p>
+                    </div>
+                    <div class="tape-effect" style="position:absolute; top:-10px; right:36px; width:80px; height:18px; transform:rotate(-3deg); opacity:0.9;"></div>
+                    <div class="tape-effect" style="position:absolute; bottom:-10px; left:36px; width:64px; height:18px; transform:rotate(2deg); opacity:0.9;"></div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <hr style="border: 0; border-top: 1px solid #eee; margin: 20px 0;">
+
+        <!-- Daily Journal -->
+        <div id="diary" class="section-wrapper">
+            <div style="display:flex; align-items:center; gap:8px; margin-bottom:8px;">
+                <div class="section-header">Daily Journal</div>
+                <span style="color:#2bee6c;">📝</span>
+            </div>
+            <div style="display:flex; gap:10px; overflow-x:auto; padding-bottom:8px;" id="diary-recs">
+                {% for r in recs %}
+                <button class="chip" data-text="{{ r }}">{{ r }}</button>
+                {% endfor %}
+            </div>
+            {% if content %}
+                <p class="section-text" id="diary-display-text">{{ content }}</p>
+            {% else %}
+                <p class="section-text" id="diary-display-text" style="color:#8E8E93;">{{ prompt_hint }}</p>
+            {% endif %}
+            <div style="position:relative; margin-top:10px;">
+                <textarea class="text-editor-area" id="diary-input" placeholder="Today, I went to the cafe..." style="min-height:160px; display:none;"></textarea>
+            </div>
+            <div style="display:flex; justify-content:flex-end; margin-top:10px; gap:8px;">
+                <button class="save-btn" id="edit-toggle" style="padding:10px 18px; border-radius:999px; font-weight:700;">Edit</button>
+                <button class="save-btn" id="edit-save" style="padding:10px 18px; border-radius:999px; font-weight:700;">Save Entry</button>
+            </div>
+        </div>
+
+        <hr style="border: 0; border-top: 1px solid #eee; margin: 20px 0;">
+
+        <!-- Letter Section -->
+        <div id="letter" class="section-wrapper">
+            <div class="section-header" style="color:#7b7bfe">The Letter</div>
+            <div id="envelope" style="background:#f6f8f6; border:1px solid #e5e5ea; border-radius:16px; padding:14px; position:relative; cursor:pointer;">
+                <div style="height:48px; background:linear-gradient(135deg,#fff,#f7f7f7); border-radius:10px; position:relative;">
+                    <div style="position:absolute; right:12px; top:12px; width:24px; height:24px; border-radius:50%; background:#7b7bfe; color:#fff; display:flex; align-items:center; justify-content:center;">✉</div>
+                </div>
+                <div id="letterBody" style="max-height:0; overflow:hidden; transition:max-height .3s ease; padding:0 4px;">
+                    <div style="padding-top:12px;">
+                        <div class="letter-sub">🐾 From your companion</div>
+                        <div id="letterText" class="section-text" style="white-space:pre-wrap; margin-top:8px;">{{ daily_letter }}</div>
+                        <button id="genLetterBtn" class="save-btn" style="width:100%; margin-top:12px; display:none;">Generate Letter</button>
+                    </div>
+                </div>
+            </div>
+            <div style="height: 50px;"></div>
+        </div>
+    </div>
+
+    <div style="position:fixed; right:24px; bottom:24px; z-index:50;">
+        <button style="width:64px; height:64px; background:#2bee6c; color:#0e1c12; border-radius:999px; box-shadow:0 8px 30px rgba(43,238,108,0.4); display:flex; align-items:center; justify-content:center; font-size:28px;">+</button>
+    </div>
+
+    <!-- VIEW 2: EDIT OVERLAY -->
+    <div class="edit-view" id="edit-view">
+        <div class="header">
+            <div class="back-btn" id="edit-back">←</div>
+            <div class="tabs">
+                <span class="tab">Moments</span>
+                <span class="tab active" style="color:var(--primary-purple)">Diary</span>
+                <span class="tab">Letter</span>
+            </div>
+            <div class="date-share">{{ date }} ⎋</div>
+        </div>
+        <div class="section-header" style="padding: 15px 20px 0;">
+            Diary <span class="edit-icon">📝</span>
+        </div>
+        <div class="edit-content">
+            <div class="suggestion-label">
+                Refine your diary:
+            </div>
+            <div class="suggestion-box" id="suggestionBox">{{ prompt_hint }}</div>
+            <textarea class="text-editor-area" id="diary-input" placeholder="Today, I ..."></textarea>
+        </div>
+        <div class="keyboard">
+            <div class="kb-row"><div class="key">Q</div><div class="key">W</div><div class="key">E</div><div class="key">R</div><div class="key">T</div><div class="key">Y</div><div class="key">U</div><div class="key">I</div><div class="key">O</div><div class="key">P</div></div>
+            <div class="kb-row" style="padding: 0 10px;"><div class="key">A</div><div class="key">S</div><div class="key">D</div><div class="key">F</div><div class="key">G</div><div class="key">H</div><div class="key">J</div><div class="key">K</div><div class="key">L</div></div>
+            <div class="kb-row"><div class="key wide">⬆</div><div class="key">Z</div><div class="key">X</div><div class="key">C</div><div class="key">V</div><div class="key">B</div><div class="key">N</div><div class="key">M</div><div class="key wide">⌫</div></div>
+            <div class="kb-row"><div class="key wide">123</div><div class="key space">space</div><div class="key wide blue" id="kb-return">return</div></div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+    <script>
+    /* === TAB NAVIGATION (Quick Jump) === */
+    const tabs = document.querySelectorAll('.tab');
+    
+    // Map data-targets to IDs
+    tabs.forEach(tab => {
+        tab.addEventListener('click', () => {
+            const targetId = tab.getAttribute('data-target');
+            if(!targetId) return;
+
+            const targetSection = document.getElementById(targetId);
+            
+            // Switch Active Style
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            tab.classList.add('active');
+            
+            if (targetSection) {
+                targetSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+        });
+    });
+
+    /* === EDIT MODE LOGIC === */
+    const editToggle = document.getElementById('edit-toggle');
+    const editSave = document.getElementById('edit-save');
+    const diaryDisplay = document.getElementById('diary-display-text');
+    const diaryInput = document.getElementById('diary-input');
+    const recChips = Array.from(document.querySelectorAll('#diary-recs .chip'));
+    const suggestionBox = document.getElementById('suggestionBox');
+    const shareBtn = document.getElementById('shareLongImg');
+    const envelope = document.getElementById('envelope');
+    const letterBody = document.getElementById('letterBody');
+    const letterText = document.getElementById('letterText');
+    const genLetterBtn = document.getElementById('genLetterBtn');
+
+    function showEditor() {
+        diaryInput.value = diaryDisplay.innerText.trim();
+        diaryDisplay.style.display = 'none';
+        diaryInput.style.display = 'block';
+        diaryInput.focus();
+    }
+    function saveEditor() {
+        diaryDisplay.innerText = diaryInput.value.trim();
+        diaryInput.style.display = 'none';
+        diaryDisplay.style.display = '';
+    }
+    if (editToggle) editToggle.addEventListener('click', showEditor);
+    if (editSave) editSave.addEventListener('click', saveEditor);
+    diaryDisplay.addEventListener('click', showEditor);
+
+    /* === Chips Drag to Editor === */
+    function insertAtCursor(textarea, text) {
+        const start = textarea.selectionStart ?? textarea.value.length;
+        const end = textarea.selectionEnd ?? textarea.value.length;
+        const before = textarea.value.substring(0, start);
+        const after = textarea.value.substring(end);
+        textarea.value = `${before}${text} ${after}`;
+        textarea.selectionStart = textarea.selectionEnd = start + text.length + 1;
+        textarea.focus();
+    }
+    recChips.forEach(ch => {
+        ch.addEventListener('dragstart', (e) => {
+            e.dataTransfer.setData('text/plain', ch.dataset.text || ch.textContent);
+        });
+    });
+    diaryInput.addEventListener('dragover', (e) => { e.preventDefault(); });
+    diaryInput.addEventListener('drop', (e) => {
+        e.preventDefault();
+        const txt = e.dataTransfer.getData('text/plain');
+        if (txt) insertAtCursor(diaryInput, txt);
+    });
+
+    /* === Long Press Edit Moment Caption === */
+    let lpTimer = null;
+    document.querySelectorAll('.moment-caption').forEach(p => {
+        p.addEventListener('pointerdown', () => {
+            lpTimer = setTimeout(() => {
+                p.setAttribute('contenteditable','true');
+                p.focus();
+            }, 600);
+        });
+        ['pointerup','pointerleave','pointercancel'].forEach(ev => {
+            p.addEventListener(ev, () => { if (lpTimer) { clearTimeout(lpTimer); lpTimer = null; } });
+        });
+        p.addEventListener('blur', () => { p.removeAttribute('contenteditable'); });
+    });
+
+    Array.from(document.querySelectorAll('.moment-wrapper')).forEach(w => {
+        const orig = w.style.transform || '';
+        w.addEventListener('mouseenter', () => {
+            w.style.zIndex = '999';
+            w.style.transform = orig + ' scale(1.045)';
+            w.style.filter = 'brightness(1.04)';
+        });
+        w.addEventListener('mouseleave', () => {
+            w.style.zIndex = '';
+            w.style.transform = orig;
+            w.style.filter = '';
+        });
+    });
+
+    /* === Envelope Toggle & Generate === */
+    envelope.addEventListener('click', () => {
+        const isOpen = letterBody.style.maxHeight && letterBody.style.maxHeight !== '0px';
+        if (isOpen) {
+            letterBody.style.maxHeight = '0px';
+        } else {
+            letterBody.style.maxHeight = '320px';
+        }
+    });
+    if (genLetterBtn) {
+        genLetterBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const dk = "{{ date_key }}";
+            fetch("{{ url_for('diary_letter_generate') }}", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ date_key: dk }),
+            })
+                .then(res => res.text())
+                .then(html => {
+                    const tmp = document.createElement('div');
+                    tmp.innerHTML = html;
+                    const txtEl = tmp.querySelector('#letterText');
+                    if (txtEl) letterText.textContent = txtEl.textContent;
+                    else letterText.textContent = "It was a meaningful day. Keep going.";
+                })
+                .catch(() => {
+                    letterText.textContent = "It was a meaningful day. Keep going.";
+                });
+        });
+    }
+
+    /* === Long Image Share === */
+    if (shareBtn) {
+        shareBtn.addEventListener('click', async () => {
+            try {
+                const node = document.getElementById('scroll-container');
+                const canvas = await html2canvas(node, { backgroundColor: '#fff', scale: 2 });
+                const dataUrl = canvas.toDataURL('image/png');
+                const a = document.createElement('a');
+                a.href = dataUrl;
+                a.download = `Moments-{{ date_key }}.png`;
+                a.click();
+            } catch (e) {}
+        });
+    }
+</script>
+{% endblock %}
