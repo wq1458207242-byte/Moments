@@ -274,15 +274,36 @@
 
     Array.from(document.querySelectorAll('.moment-wrapper')).forEach(w => {
         const orig = w.style.transform || '';
-        w.addEventListener('mouseenter', () => {
+        let lpTimer = null, sx = 0, sy = 0, activated = false;
+        function activate() {
+            activated = true;
             w.style.zIndex = '999';
             w.style.transform = orig + ' scale(1.045)';
             w.style.filter = 'brightness(1.04)';
-        });
-        w.addEventListener('mouseleave', () => {
+        }
+        function deactivate() {
+            activated = false;
             w.style.zIndex = '';
             w.style.transform = orig;
             w.style.filter = '';
+        }
+        w.addEventListener('mouseenter', () => activate());
+        w.addEventListener('mouseleave', () => deactivate());
+        w.addEventListener('pointerdown', (e) => {
+            sx = e.clientX; sy = e.clientY;
+            lpTimer = setTimeout(activate, 500);
+        });
+        w.addEventListener('pointermove', (e) => {
+            if (lpTimer && !activated) {
+                const dx = e.clientX - sx, dy = e.clientY - sy;
+                if (dx*dx + dy*dy > 100) { clearTimeout(lpTimer); lpTimer = null; }
+            }
+        });
+        ['pointerup','pointercancel','pointerleave'].forEach(ev => {
+            w.addEventListener(ev, () => {
+                if (lpTimer) { clearTimeout(lpTimer); lpTimer = null; }
+                deactivate();
+            });
         });
     });
 
