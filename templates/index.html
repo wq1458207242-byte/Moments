@@ -1,0 +1,50 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<div class="home-content">
+    <div class="top-nav">
+        <div style="display: flex; align-items: center;">
+            <div class="progress-container">
+                <div class="progress-bar"></div>
+            </div>
+            <span class="level-tag">Lv.5</span>
+        </div>
+        <div class="streak-tag">
+            🔥 3 Days
+        </div>
+    </div>
+
+    <div class="header-text">
+        People don't take trips,<br>
+        trips take <span class="highlight">people</span>
+    </div>
+
+    <div class="speech-bubble">
+        Yummy! That was a great memory!
+    </div>
+
+    <a class="main-circle" href="{{ url_for('profile') }}" style="text-decoration:none;">
+        OwO
+    </a>
+
+    <div class="bottom-actions">
+        <!-- 
+            UPDATED: Navigate directly to Camera Interface.
+            NO form or input file here.
+        -->
+        <a href="{{ url_for('camera') }}" class="action-item" style="text-decoration: none;">
+            <div class="icon-circle">
+                <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#FF7A45" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg>
+            </div>
+            <span class="action-label">Capture Moments</span>
+        </a>
+
+        <a href="{{ url_for('momentsbook') }}" class="action-item" style="text-decoration: none;">
+            <div class="icon-circle alt">
+                <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#FF7A45" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg>
+            </div>
+            <span class="action-label">Open Momentsbook</span>
+        </a>
+    </div>
+</div>
+{% endblock %}

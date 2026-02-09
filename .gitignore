@@ -1,0 +1,41 @@
+# Python caches and artifacts
+__pycache__/
+*.py[cod]
+*.so
+.Python
+build/
+dist/
+.mypy_cache/
+.pytest_cache/
+.coverage
+coverage.xml
+
+# Virtual environments and tooling
+.venv/
+venv/
+env/
+.env
+.vscode/
+.idea/
+.trae/
+
+# Project local data and logs
+energy_log.json
+moments_store.json
+profile_store.json
+word_cards_store.json
+config.ini
+
+# Uploaded files (user content)
+static/uploads/
+
+# Large models and binaries
+pretrained_models/
+*.onnx
+*.onnx.json
+ffmpeg-release-essentials.zip
+Matcha-TTS.zip
+
+# OS files
+.DS_Store
+Thumbs.db

@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Vocab Review Dashboard</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,typography,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;1,400&amp;family=Inter:wght@300;400;500;600;700;800&amp;family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script>
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        primary: "#10B981",
+                        accent: "#F59E0B",
+                        surface: {
+                            light: "#FFFFFF",
+                            dark: "#0F172A",
+                        },
+                        background: {
+                            light: "#F8FAFC",
+                            dark: "#020617",
+                        }
+                    },
+                    fontFamily: {
+                        display: ["Playfair Display", "serif"],
+                        sans: ["Inter", "sans-serif"],
+                    }
+                },
+            },
+        };
+    </script>
+<style type="text/tailwindcss">
+        @layer utilities {
+            .hide-scrollbar::-webkit-scrollbar { display: none; }
+            .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+            .glass {
+                @apply backdrop-blur-md bg-white/70 dark:bg-slate-900/70 border border-white/20 dark:border-slate-800/50;
+            }
+            .vocab-badge {
+                @apply px-3 py-1.5 rounded-xl text-sm font-semibold transition-all active:scale-95;
+            }
+        }
+        :root {
+            --primary-glow: rgba(16, 185, 129, 0.15);
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background-light dark:bg-background-dark text-slate-900 dark:text-slate-100 font-sans antialiased min-h-screen">
+<header class="sticky top-0 z-50 glass border-b border-slate-200 dark:border-slate-800">
+<div class="max-w-md mx-auto px-4 py-4">
+<div class="flex items-center justify-between mb-6">
+<div class="flex flex-col">
+<span class="text-[10px] uppercase tracking-widest font-bold text-slate-400">Review Cycle</span>
+<h1 class="font-display text-2xl font-bold">Lexical Progress</h1>
+</div>
+<div class="flex gap-2">
+<button class="p-2 rounded-full bg-slate-100 dark:bg-slate-800">
+<span class="material-symbols-outlined text-xl">insights</span>
+</button>
+<button class="p-2 rounded-full bg-primary/10 text-primary">
+<span class="material-symbols-outlined text-xl">school</span>
+</button>
+</div>
+</div>
+<div class="flex justify-between items-end gap-1 overflow-x-auto hide-scrollbar pb-2">
+<div class="flex-shrink-0 flex flex-col items-center gap-1 group">
+<div class="w-8 h-12 bg-slate-100 dark:bg-slate-800 rounded-lg flex flex-col items-center justify-end pb-1 relative">
+<div class="absolute inset-x-1 bottom-1 bg-primary/20 rounded-sm h-[30%]"></div>
+<span class="text-[10px] font-bold z-10 text-slate-400">25</span>
+</div>
+<span class="text-[8px] uppercase font-bold text-slate-400">S</span>
+</div>
+<div class="flex-shrink-0 flex flex-col items-center gap-1 group">
+<div class="w-8 h-12 bg-slate-100 dark:bg-slate-800 rounded-lg flex flex-col items-center justify-end pb-1 relative">
+<div class="absolute inset-x-1 bottom-1 bg-primary/40 rounded-sm h-[50%]"></div>
+<span class="text-[10px] font-bold z-10 text-slate-400">26</span>
+</div>
+<span class="text-[8px] uppercase font-bold text-slate-400">M</span>
+</div>
+<div class="flex-shrink-0 flex flex-col items-center gap-1 group">
+<div class="w-8 h-12 bg-primary/10 border-2 border-primary/30 rounded-lg flex flex-col items-center justify-end pb-1 relative">
+<div class="absolute inset-x-1 bottom-1 bg-primary rounded-sm h-[90%]"></div>
+<span class="text-[10px] font-bold z-10 text-white">27</span>
+</div>
+<span class="text-[8px] uppercase font-bold text-primary">T</span>
+</div>
+<div class="flex-shrink-0 flex flex-col items-center gap-1 group">
+<div class="w-8 h-12 bg-slate-100 dark:bg-slate-800 rounded-lg flex flex-col items-center justify-end pb-1 relative">
+<div class="absolute inset-x-1 bottom-1 bg-primary/10 rounded-sm h-[15%]"></div>
+<span class="text-[10px] font-bold z-10 text-slate-400">28</span>
+</div>
+<span class="text-[8px] uppercase font-bold text-slate-400">W</span>
+</div>
+<div class="flex-shrink-0 flex flex-col items-center gap-1 group">
+<div class="w-8 h-12 bg-slate-100 dark:bg-slate-800 rounded-lg flex flex-col items-center justify-end pb-1 relative">
+<div class="absolute inset-x-1 bottom-1 bg-primary/60 rounded-sm h-[65%]"></div>
+<span class="text-[10px] font-bold z-10 text-slate-400">29</span>
+</div>
+<span class="text-[8px] uppercase font-bold text-slate-400">T</span>
+</div>
+<div class="flex-shrink-0 flex flex-col items-center gap-1 group">
+<div class="w-8 h-12 bg-slate-100 dark:bg-slate-800 rounded-lg flex flex-col items-center justify-end pb-1 relative">
+<div class="absolute inset-x-1 bottom-1 bg-primary/30 rounded-sm h-[40%]"></div>
+<span class="text-[10px] font-bold z-10 text-slate-400">30</span>
+</div>
+<span class="text-[8px] uppercase font-bold text-slate-400">F</span>
+</div>
+<div class="flex-shrink-0 flex flex-col items-center gap-1 group">
+<div class="w-10 h-14 bg-accent/20 border-2 border-accent rounded-lg flex flex-col items-center justify-end pb-2 relative ring-4 ring-accent/10">
+<div class="absolute inset-x-1.5 bottom-1.5 bg-accent rounded-md h-[100%] animate-pulse"></div>
+<span class="text-xs font-black z-10 text-white">31</span>
+</div>
+<span class="text-[10px] uppercase font-black text-accent">Sat</span>
+</div>
+</div>
+<p class="text-[10px] text-center mt-3 text-slate-400 italic">Height indicates volume of new words identified by AI</p>
+</div>
+</header>
+<main class="max-w-md mx-auto px-4 pb-32 pt-6">
+<section class="mb-10">
+<div class="flex items-center justify-between mb-4">
+<div class="flex flex-col">
+<h2 class="font-display text-4xl font-bold italic text-slate-900 dark:text-white leading-tight">Jan 31</h2>
+<span class="text-xs font-semibold text-primary uppercase tracking-tighter">18 New Terms • 4 Memories</span>
+</div>
+<button class="bg-primary text-white p-3 rounded-2xl shadow-xl shadow-primary/20 active:scale-95 transition-transform">
+<span class="material-symbols-outlined text-2xl">play_circle</span>
+</button>
+</div>
+<div class="grid grid-cols-2 gap-3 mb-6">
+<div class="bg-surface-light dark:bg-surface-dark p-4 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm relative overflow-hidden group">
+<div class="absolute top-0 right-0 p-2 opacity-20 group-hover:opacity-100 transition-opacity">
+<span class="material-symbols-outlined text-sm">visibility</span>
+</div>
+<div class="text-xs font-bold text-slate-400 mb-1">NOUN</div>
+<h3 class="text-xl font-bold mb-2">Racket</h3>
+<p class="text-[10px] leading-relaxed text-slate-500 mb-3 italic">"A bat with a round or oval frame used in tennis."</p>
+<div class="flex items-center gap-2">
+<img alt="context" class="w-8 h-8 rounded-lg object-cover ring-1 ring-slate-200" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBiL-uMunidGxKKZDm1UFH26kZuHgJoscJ38u7PPLf-K1hwuMqVE5M5bV40S0nEP4rbHoYObtIVwNhI8yt47ct_Jzs6d3LHZRxpNOFHf2l9Vj4MG_AF5eND_5Ut7_d-6CQNPwJa2CergKVDcaJ9INADDLCUsqcac3XYof-24l9uU1JJbV7kFnJIT--Fz9I9h8_OuwL47RFKtjgi1CHCVUSXFJAjaGTNicakF4mU94kBrA1rvKMVAoWyN3UqDJ3XlzooEXIlUZnXyxt0"/>
+<span class="text-[10px] font-medium text-primary">Contextualized</span>
+</div>
+</div>
+<div class="bg-surface-light dark:bg-surface-dark p-4 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm relative overflow-hidden">
+<div class="text-xs font-bold text-slate-400 mb-1">NOUN</div>
+<h3 class="text-xl font-bold mb-2">Focus</h3>
+<p class="text-[10px] leading-relaxed text-slate-500 mb-3 italic">"The center of interest or activity."</p>
+<div class="flex items-center gap-2">
+<img alt="context" class="w-8 h-8 rounded-lg object-cover ring-1 ring-slate-200" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBm9dPI45NCFHr_Kh90_qCiUczeuM9TEr-OlQjDe5l-PY2K7aHtvUI5LSzjISGD3qOl45Jr1-I6WFGXtd5p_jfONGvx35sOrD8FSZPeCKs0v-Hm2PKuxCS_Z9tSDT2Zm2I6p8sy4X2q0_fMWzDRpc8AjCm1cVFxuOSONBvar5psu1Fs6Y19DEqcQpNuOxEwR1TsndpqcmW9BcllC_Xc98GDE32goxY9oqlLiZ87uLYkL2iHs2jsMm2hOTrQ521COLUcbibjcPYagds4"/>
+<span class="text-[10px] font-medium text-primary">Contextualized</span>
+</div>
+</div>
+<div class="col-span-2 flex flex-wrap gap-2 py-2">
+<span class="vocab-badge bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700">Tennis</span>
+<span class="vocab-badge bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700">Competition</span>
+<span class="vocab-badge bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700">Athletic</span>
+<span class="vocab-badge bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700">Grip</span>
+<span class="vocab-badge bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700">Posture</span>
+<button class="vocab-badge bg-primary/10 text-primary border border-primary/20">+12 more</button>
+</div>
+</div>
+<div class="rounded-3xl overflow-hidden h-32 relative group cursor-pointer shadow-inner bg-slate-200">
+<img alt="daily moment" class="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBfEq7gRpq21GZuGc7VEKXuNpEkQxkbWGOB_ovXDOE_MoEbAVRYWc4cU5ErhqtZed5k1Eg1gsbHs-0MvgMi8eoxKSGK7TBanXjuxDtL7p6VEkpS7W8SuIZkQnR-qfOT6zG8aJFpcrE8yZZ_4QXyusHiszsZ0lIu9sUhKxtbLLUy70xbQ4H367No5pw9TPQbSUxoF_b2DRgsWEhzS82W_JzT4eDyWZSDlcfy6A3qHu-TOfsg4J7zK65BkLW3CcPUtL1GBPrjOBfGCT7c"/>
+<div class="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent flex items-end p-4">
+<span class="text-white text-xs font-medium flex items-center gap-2">
+<span class="material-symbols-outlined text-sm">photo_library</span>
+                    Tap to view visual context for Jan 31
+                </span>
+</div>
+</div>
+</section>
+<section class="opacity-70 grayscale-[0.5]">
+<div class="flex items-center justify-between mb-4 border-t border-slate-100 dark:border-slate-800 pt-8">
+<div class="flex flex-col">
+<h2 class="font-display text-3xl font-bold italic text-slate-900 dark:text-white leading-tight">Feb 01</h2>
+<span class="text-xs font-semibold text-slate-400 uppercase tracking-tighter">5 New Terms • 1 Memory</span>
+</div>
+<button class="bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-400 p-2 rounded-xl active:scale-95 transition-transform">
+<span class="material-symbols-outlined text-xl">history</span>
+</button>
+</div>
+<div class="space-y-3">
+<div class="flex items-center justify-between p-4 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800">
+<div class="flex items-center gap-4">
+<div class="w-12 h-12 rounded-xl overflow-hidden bg-slate-100">
+<img class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBVJ24XM3CXU-j8QoI1u34cU2lKZBWSYwpAmpxwt-45JUqWPCqeW-ba7g1LMkz7aN7iHvrdwYyAuqjxh6FXyS6N-LTMJouK8grn167QGJmJRIb-4QuPbR_H5oj1KSOZ7taSNXhy105-vBzG7ZA_mZGrBOnl7tjHiTtbrud3dxUQEMLUOlJysqog9MqdzEjT1GJebxx5v59DG3z9pZTUCC2XY4OeUjWklH-gq-6Nt0ffK3uieBjUNs697Z71RuZrL9Fl_h8neGy1TcLZ"/>
+</div>
+<div>
+<h4 class="font-bold">Minimalism</h4>
+<p class="text-[10px] text-slate-400">Encountered in book cover capture</p>
+</div>
+</div>
+<span class="material-symbols-outlined text-primary">check_circle</span>
+</div>
+<div class="flex items-center justify-between p-4 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800">
+<div class="flex items-center gap-4">
+<div class="w-12 h-12 rounded-xl overflow-hidden bg-slate-100">
+<img class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDOyU6ldvrSpGcOLo21kRnq5YQ7eczF1_-iQF4GKqGkNGVXUP7YYYbWVEc8FSUBkSh1InfjNn36bhaZBaPzvAGiIVduSsVD0eqLlWt0x7DVveJ3uxFRMLkcuhzmU9qUjg7fJEZCSeRAO6y1edkQ8F4ECbAWQPqZJVcg4I9dEWNYw-xwxwg9YEg5C7bjqYVVQbpycZNa4ynGeaPKygKEph6nTsq1zMKAGl0KH8esEo6SLwaI8RQ1Am1FDnTIY_J18Vxdezdgq9DxuFC4"/>
+</div>
+<div>
+<h4 class="font-bold">Academia</h4>
+<p class="text-[10px] text-slate-400">Identified from study scene</p>
+</div>
+</div>
+<span class="material-symbols-outlined text-slate-300">circle</span>
+</div>
+</div>
+</section>
+</main>
+<nav class="fixed bottom-0 w-full glass border-t border-slate-200 dark:border-slate-800 px-6 pt-2 pb-8 z-50">
+<div class="max-w-md mx-auto flex justify-between items-center">
+<button class="flex flex-col items-center gap-1 text-slate-400 hover:text-primary transition-colors">
+<span class="material-symbols-outlined text-2xl">grid_view</span>
+</button>
+<button class="flex flex-col items-center gap-1 text-slate-400 hover:text-primary transition-colors">
+<span class="material-symbols-outlined text-2xl">search</span>
+</button>
+<div class="relative -mt-12">
+<button class="bg-primary text-white w-14 h-14 rounded-2xl shadow-2xl shadow-primary/40 flex items-center justify-center ring-8 ring-background-light dark:ring-background-dark hover:scale-105 transition-transform">
+<span class="material-symbols-outlined text-3xl font-bold">add</span>
+</button>
+</div>
+<button class="flex flex-col items-center gap-1 text-primary">
+<span class="material-symbols-outlined text-2xl" style="font-variation-settings: 'FILL' 1">menu_book</span>
+</button>
+<button class="flex flex-col items-center gap-1 text-slate-400 hover:text-primary transition-colors">
+<span class="material-symbols-outlined text-2xl">account_circle</span>
+</button>
+</div>
+</nav>
+
+</body></html>

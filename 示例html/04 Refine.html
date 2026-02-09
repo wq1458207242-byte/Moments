@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Interactive Correction UI</title>
+    <style>
+        :root {
+            --primary-orange: #FF6B00;
+            /* 背景高亮色 */
+            --bg-blue: #E1F0FF;
+            --bg-green: #E3F8E5;
+            --bg-yellow: #FFF8C4;
+            /* 边框/文字强调色 */
+            --border-blue: #007AFF;
+            --border-green: #34C759;
+            --border-yellow: #FFCC00;
+            
+            --text-main: #1C1C1E;
+            --text-sub: #8E8E93;
+            --bg-gray: #F9F9F9;
+        }
+
+        * {
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            margin: 0;
+            background-color: #000;
+            display: flex;
+            justify-content: center;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        .phone-frame {
+            width: 100%;
+            max-width: 428px;
+            height: 100%;
+            background-color: var(--bg-gray);
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        /* --- 顶部背景 --- */
+        .header-bg {
+            height: 200px;
+            /* 使用网球场图片占位 */
+            background-image: url('https://images.unsplash.com/photo-1626246947526-7d6360c77464?q=80&w=1000&auto=format&fit=crop');
+            background-size: cover;
+            background-position: center;
+            position: absolute;
+            top: 0; left: 0; right: 0;
+            z-index: 1;
+        }
+        
+        .header-bg::after {
+            content: '';
+            position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+            background: linear-gradient(to bottom, rgba(0,0,0,0.4), rgba(0,0,0,0.1) 60%, var(--bg-gray) 95%);
+        }
+
+        .header-nav {
+            position: relative;
+            z-index: 10;
+            padding: 50px 20px 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            color: white;
+            pointer-events: none; /* 让背景不阻挡点击，但按钮单独设auto */
+        }
+
+        .nav-left {
+            display: flex; align-items: center; gap: 8px;
+            font-size: 16px; font-weight: 500;
+            pointer-events: auto; cursor: pointer;
+        }
+
+        .back-icon {
+            width: 32px; height: 32px;
+            background: rgba(255,255,255,0.2);
+            backdrop-filter: blur(4px);
+            border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+        }
+
+        .date-display { text-align: right; text-shadow: 0 2px 4px rgba(0,0,0,0.3); }
+        .date-main { font-family: 'Times New Roman', serif; font-size: 28px; font-weight: 700; font-style: italic; }
+        .date-sub { font-size: 12px; font-family: sans-serif; display: block; opacity: 0.9; margin-top: 2px; }
+
+        /* --- 滚动内容区 --- */
+        .scroll-container {
+            flex: 1;
+            z-index: 2;
+            overflow-y: auto;
+            padding: 20px;
+            padding-top: 110px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            scrollbar-width: none;
+        }
+        .scroll-container::-webkit-scrollbar { display: none; }
+
+        /* 1. 用户原文卡片 (可编辑) */
+        .user-text-card {
+            background: white;
+            border-radius: 24px;
+            padding: 24px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.05);
+            font-size: 16px;
+            line-height: 1.8; /* 增加行高以便显示背景色 */
+            color: #333;
+            outline: none; /* 去除选中时的蓝框 */
+            min-height: 150px;
+        }
+
+        /* 句子高亮段落样式 */
+        .segment {
+            border-radius: 4px;
+            padding: 2px 4px;
+            margin: 0 -2px; /* 微调左右间距 */
+            transition: background-color 0.3s ease;
+        }
+
+        .seg-blue { background-color: var(--bg-blue); }
+        .seg-green { background-color: var(--bg-green); }
+        .seg-yellow { background-color: var(--bg-yellow); }
+        
+        /* 编辑器内的特定颜色字 */
+        .text-orange { color: var(--primary-orange); font-weight: 600; }
+        .text-blue-dark { color: #0056b3; font-weight: 500; }
+
+        /* 闪烁动画 (替换时触发) */
+        @keyframes flash {
+            0% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+        .animate-change {
+            animation: flash 0.4s ease-out;
+        }
+
+        .audio-icon-row { margin-top: 10px; opacity: 0.6; }
+
+        /* 2. AI 反馈 */
+        .feedback-row {
+            display: flex; align-items: center; gap: 10px; justify-content: flex-end;
+        }
+        .feedback-bubble {
+            background: white; border: 1px solid #E5E5EA; padding: 12px 16px;
+            border-radius: 16px; border-bottom-right-radius: 4px;
+            font-size: 13px; color: var(--text-main); font-weight: 600;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.03);
+        }
+        .ai-avatar {
+            width: 40px; height: 40px;
+            background: linear-gradient(135deg, #E0F7FA 0%, #E1F5FE 100%);
+            border-radius: 50%; display: flex; align-items: center; justify-content: center;
+            font-size: 12px; color: #8E8E93; font-weight: bold;
+        }
+
+        /* 3. 推荐修正区域 */
+        .recommendation-section {
+            display: flex; flex-direction: column; gap: 16px;
+            margin-bottom: 40px;
+        }
+        .section-header { display: flex; align-items: center; gap: 10px; padding-left: 4px; }
+        .orange-line { width: 3px; height: 14px; background-color: var(--primary-orange); border-radius: 2px; }
+        .section-title { font-size: 13px; color: #555; font-weight: 500; }
+
+        /* 修正卡片 */
+        .rec-card {
+            background: white; border-radius: 16px; padding: 20px;
+            font-size: 15px; color: var(--text-main); line-height: 1.5;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.03);
+            border-left-width: 4px; border-left-style: solid;
+            cursor: pointer; /* 鼠标变为手型 */
+            transition: transform 0.1s, background-color 0.2s;
+            position: relative;
+        }
+
+        .rec-card:active { transform: scale(0.98); background-color: #fafafa; }
+        
+        /* 交互提示 */
+        .rec-card::after {
+            content: 'Tap to replace';
+            position: absolute; right: 15px; top: 50%; transform: translateY(-50%);
+            font-size: 10px; color: #C7C7CC; opacity: 0; transition: opacity 0.2s;
+        }
+        .rec-card:hover::after { opacity: 1; }
+
+        .rec-card.blue { border-left-color: var(--border-blue); }
+        .rec-card.green { border-left-color: var(--border-green); }
+        .rec-card.yellow { border-left-color: var(--border-yellow); }
+
+        .rec-card strong { color: var(--primary-orange); font-weight: 600; }
+
+        /* 底部按钮 */
+        .save-btn {
+            width: 100%; background: var(--primary-orange); color: white; border: none;
+            padding: 18px; border-radius: 30px; font-size: 16px; font-weight: 600;
+            cursor: pointer; box-shadow: 0 6px 20px rgba(255, 107, 0, 0.25);
+            margin-bottom: 40px;
+        }
+
+    </style>
+</head>
+<body>
+
+    <div class="phone-frame">
+        
+        <div class="header-bg"></div>
+        
+        <div class="header-nav">
+            <div class="nav-left">
+                <div class="back-icon">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
+                </div>
+                <span>Last step</span>
+            </div>
+            <div class="date-display">
+                <div class="date-main">January 31th</div>
+                <span class="date-sub">2026</span>
+            </div>
+        </div>
+
+        <div class="scroll-container">
+            
+            <!-- 
+              1. 可编辑文本区域 
+              注意：ID 对应下方卡片的 data-target
+            -->
+            <div class="user-text-card" id="editor" contenteditable="true">
+                <!-- 蓝色段落 -->
+                <span id="target-blue" class="segment seg-blue">A sunny day, I play <span class="text-blue-dark">tennis</span>.</span>
+                
+                <!-- 绿色段落 -->
+                <span id="target-green" class="segment seg-green">I very like my <span class="text-orange">Vibrant</span> green <span class="text-orange">racket</span> and green ball.</span>
+                
+                <!-- 普通文本 -->
+                <span> I ready for a good game. Now I take break on <span class="text-orange">court</span>. </span>
+                
+                <!-- 黄色段落 -->
+                <span id="target-yellow" class="segment seg-yellow">The sun is bright. The <span class="text-orange">Crisp</span> shadow is long. It make me feel very happy and energy.</span>
+                
+                <div class="audio-icon-row" contenteditable="false">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#1C1C1E" stroke-width="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path></svg>
+                </div>
+            </div>
+
+            <!-- 2. 反馈气泡 -->
+            <div class="feedback-row">
+                <div class="feedback-bubble">"Looks like you've had a great practice session!"</div>
+                <div class="ai-avatar">OwO</div>
+            </div>
+
+            <!-- 
+              3. 推荐卡片 (点击触发替换) 
+              data-target: 指向上面对应颜色的 span id
+            -->
+            <div class="recommendation-section">
+                <div class="section-header">
+                    <div class="orange-line"></div>
+                    <span class="section-title">Blow are recommended version of expresssion:</span>
+                </div>
+
+                <!-- 蓝色推荐 -->
+                <div class="rec-card blue" onclick="replaceText('target-blue', this)">
+                    A sunny day for <strong>tennis</strong>!
+                </div>
+
+                <!-- 绿色推荐 -->
+                <div class="rec-card green" onclick="replaceText('target-green', this)">
+                    I love the <strong>vibrant</strong> green of my <strong>racket</strong> and balls.
+                </div>
+
+                <!-- 黄色推荐 -->
+                <div class="rec-card yellow" onclick="replaceText('target-yellow', this)">
+                    The <strong>crisp</strong> shadows and the bright morning sun make everything feel so active and energized.
+                </div>
+                
+                <div style="margin-top: -8px;">
+                    <span style="background:#E5E5EA; color:#8E8E93; font-size:10px; padding:4px 10px; border-radius:12px;">Want more ?</span>
+                </div>
+            </div>
+
+            <button class="save-btn" onclick="alert('Saved successfully!')">Save and Done!</button>
+
+        </div>
+    </div>
+
+    <script>
+        /**
+         * 替换文本函数
+         * @param {string} targetId - 上方编辑器中对应 span 的 ID (如 target-blue)
+         * @param {HTMLElement} sourceElement - 被点击的推荐卡片元素
+         */
+        function replaceText(targetId, sourceElement) {
+            const targetSpan = document.getElementById(targetId);
+            
+            if (targetSpan) {
+                // 1. 获取推荐卡片内的 HTML 内容 (保留 strong 等标签)
+                // trim() 去除多余空格
+                const newContent = sourceElement.innerHTML.trim();
+                
+                // 2. 替换上方对应 span 的内容
+                targetSpan.innerHTML = newContent;
+
+                // 3. 添加一个简单的闪烁动画效果，提示用户已修改
+                targetSpan.classList.remove('animate-change');
+                void targetSpan.offsetWidth; // 触发重绘，允许动画重新播放
+                targetSpan.classList.add('animate-change');
+
+                // 4. (可选) 给推荐卡片一个反馈样式，例如变淡或加对勾，这里暂时略过
+            }
+        }
+    </script>
+</body>
+</html>

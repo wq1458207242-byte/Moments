@@ -1,0 +1,543 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Moments UI Replica v3</title>
+    <style>
+        :root {
+            --primary-orange: #FF6B00;
+            --tag-bg: #FFFFFF;
+            --text-main: #1C1C1E;
+            --text-sub: #8E8E93;
+            --bg-color: #000;
+            --chip-bg: #F2F2F7;
+            --chip-border: #E5E5EA;
+        }
+
+        * {
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            margin: 0;
+            background-color: var(--bg-color);
+            display: flex;
+            justify-content: center;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        .phone-frame {
+            width: 100%;
+            max-width: 428px;
+            height: 100%;
+            background-color: #fff;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        /* --- 1. 视觉层 (保持不变) --- */
+        .vision-layer {
+            position: relative;
+            flex: 1.2;
+            background-color: #333;
+            background-image: url('https://images.unsplash.com/photo-1612398567540-3665768e3d82?q=80&w=1000&auto=format&fit=crop');
+            background-size: cover;
+            background-position: center;
+            border-bottom-left-radius: 32px;
+            border-bottom-right-radius: 32px;
+            overflow: hidden;
+            transition: background-image 0.3s ease;
+        }
+
+        #fileInput { display: none; }
+
+        .header-overlay {
+            position: absolute;
+            top: 0; left: 0; right: 0;
+            padding: 50px 24px 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            z-index: 10;
+            pointer-events: none;
+        }
+
+        .back-btn {
+            width: 40px; height: 40px;
+            background: rgba(255, 255, 255, 0.25);
+            backdrop-filter: blur(8px);
+            border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            color: white; font-size: 20px;
+            pointer-events: auto; cursor: pointer;
+        }
+
+        .date-group { text-align: right; color: white; text-shadow: 0 2px 8px rgba(0,0,0,0.3); }
+        .date-day { font-family: 'Times New Roman', Times, serif; font-size: 32px; font-style: italic; font-weight: 700; line-height: 1; }
+        .date-year { font-size: 12px; opacity: 0.9; margin-top: 2px; display: block;}
+
+        /* --- Tag 样式更新：增加 .used 状态 --- */
+        .tag {
+            position: absolute;
+            background: var(--tag-bg);
+            padding: 8px 14px;
+            border-radius: 20px;
+            display: inline-flex; align-items: center; gap: 6px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            font-size: 14px; font-weight: 600;
+            color: var(--primary-orange);
+            cursor: grab;
+            transition: all 0.2s ease;
+            z-index: 5;
+        }
+        
+        /* 当单词在输入框中存在时的高亮状态 */
+        .tag.used {
+            background: var(--primary-orange);
+            color: white;
+            transform: scale(1.05);
+            box-shadow: 0 4px 15px rgba(255, 107, 0, 0.4);
+        }
+        .tag.used svg { stroke: white; fill: none; } /* 图标变白 */
+
+        .tag svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; }
+
+        #tag-racket { top: 25%; left: 18%; }
+        #tag-tennis { top: 62%; left: 12%; }
+        #tag-container { top: 52%; right: 8%; }
+
+        .moment-badge {
+            position: absolute; bottom: 24px; left: 24px;
+            background: rgba(50, 50, 50, 0.7); backdrop-filter: blur(10px);
+            color: white; padding: 6px 12px; border-radius: 8px;
+            font-size: 12px; font-weight: 500; pointer-events: none;
+        }
+
+        /* --- 2. 创作层 --- */
+        .composition-layer {
+            flex: 1;
+            background: #fff;
+            padding: 24px;
+            display: flex; flex-direction: column; gap: 16px;
+            z-index: 2;
+        }
+
+        .title-bar {
+            display: flex; justify-content: space-between; align-items: center;
+            padding-left: 10px; border-left: 3px solid var(--primary-orange);
+            line-height: 1;
+        }
+        .section-title { font-size: 13px; color: #333; font-weight: 600; }
+        .want-more { background: #EFEFF4; color: #8E8E93; font-size: 11px; padding: 4px 10px; border-radius: 12px; }
+
+        .chips-wrapper { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 4px; }
+
+        /* --- Chip 样式更新：增加 .used 状态 --- */
+        .chip {
+            background: var(--chip-bg);
+            border: 1px solid transparent;
+            padding: 8px 14px; border-radius: 16px;
+            font-size: 12px; color: var(--text-main);
+            cursor: grab; transition: all 0.2s; white-space: nowrap;
+        }
+        .chip span { color: var(--text-sub); font-size: 11px; margin-left: 2px; }
+
+        /* Chip 高亮状态 */
+        .chip.used {
+            background: var(--primary-orange);
+            color: white;
+            border-color: var(--primary-orange);
+        }
+        .chip.used span { color: rgba(255,255,255,0.8); }
+
+        .input-area {
+            flex: 1;
+            border: 1px solid #E5E5EA; border-radius: 20px;
+            padding: 16px; display: flex; flex-direction: column;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.02);
+            position: relative;
+        }
+
+        #editor {
+            flex: 1; border: none; outline: none;
+            font-size: 15px; line-height: 1.6; color: #333;
+            overflow-y: auto; white-space: pre-wrap;
+        }
+        #editor:empty:before { content: attr(placeholder); color: #C7C7CC; }
+
+        /* 编辑器内高亮词样式 */
+        .highlight-word {
+            color: var(--primary-orange);
+            font-weight: 600;
+            background: rgba(255, 107, 0, 0.08);
+            padding: 2px 6px; border-radius: 6px; margin: 0 2px;
+            display: inline-block;
+        }
+
+        .input-footer {
+            display: flex; justify-content: space-between; align-items: flex-end;
+            margin-top: 10px;
+        }
+        .sound-icon { font-size: 20px; color: var(--text-main); cursor: pointer; }
+        .btn-done {
+            background: var(--primary-orange); color: white; border: none;
+            padding: 10px 24px; border-radius: 20px;
+            font-weight: 600; font-size: 14px;
+            box-shadow: 0 4px 10px rgba(255, 107, 0, 0.3); cursor: pointer;
+        }
+
+        /* --- 3. 新版详情弹窗 (完全对齐截图) --- */
+        .modal-overlay {
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.4); /* 半透明黑底 */
+            z-index: 50;
+            display: none;
+            justify-content: center;
+            align-items: flex-end; /* 底部对齐或居中偏下 */
+            opacity: 0;
+            transition: opacity 0.2s;
+            padding: 20px;
+        }
+        .modal-overlay.active { display: flex; opacity: 1; }
+
+        .modal-card {
+            background: white;
+            width: 100%;
+            max-width: 380px;
+            border-radius: 24px;
+            padding: 24px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            transform: translateY(20px);
+            transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            position: relative;
+            margin-bottom: 40px; /* 稍微留出底部空间 */
+        }
+        .modal-overlay.active .modal-card { transform: translateY(0); }
+
+        /* 卡片内部排版 */
+        .modal-top-action {
+            position: absolute; top: 20px; right: 20px;
+            color: #8E8E93; cursor: pointer;
+        }
+
+        .modal-title {
+            font-family: Georgia, 'Times New Roman', Times, serif; /* 衬线体 */
+            font-size: 42px;
+            color: var(--primary-orange);
+            margin: 0 0 8px 0;
+            line-height: 1;
+        }
+
+        .modal-phonetic {
+            font-size: 14px; color: #8E8E93;
+            margin-bottom: 24px;
+            font-family: sans-serif;
+        }
+
+        .modal-def-block { margin-bottom: 24px; }
+        .modal-def-title { font-weight: bold; font-size: 15px; color: #000; margin-bottom: 4px; }
+        .modal-def-detail { font-size: 14px; color: #333; line-height: 1.5; }
+
+        .modal-section-label {
+            font-size: 12px;
+            color: var(--primary-orange);
+            margin-bottom: 8px;
+            margin-top: 20px;
+            font-weight: 500;
+        }
+
+        .modal-sentence-en {
+            font-size: 14px;
+            font-weight: 600;
+            color: #1C1C1E;
+            line-height: 1.4;
+            margin-bottom: 4px;
+        }
+        
+        .modal-sentence-cn {
+            font-size: 12px;
+            color: #8E8E93;
+            line-height: 1.4;
+            margin-bottom: 12px;
+        }
+
+    </style>
+</head>
+<body>
+
+    <div class="phone-frame">
+        
+        <!-- 图片上传 (隐藏) -->
+        <input type="file" id="fileInput" accept="image/*">
+        
+        <!-- 1. 视觉层 -->
+        <div class="vision-layer" id="visionLayer" onclick="triggerUpload()">
+            <div class="header-overlay">
+                <div class="back-btn">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
+                </div>
+                <div class="date-group">
+                    <div class="date-day">January 31th</div>
+                    <span class="date-year">2026</span>
+                </div>
+            </div>
+
+            <!-- Tags -->
+            <!-- data-word 属性用于匹配输入框内容 -->
+            <div class="tag" id="tag-racket" draggable="true" data-word="Tennis Racket">
+                <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z"/></svg>
+                Tennis Racket
+            </div>
+
+            <div class="tag" id="tag-container" draggable="true" data-word="Container">
+                <svg viewBox="0 0 24 24"><rect x="5" y="4" width="14" height="16" rx="2"/><line x1="5" y1="9" x2="19" y2="9"/></svg>
+                Container
+            </div>
+
+            <div class="tag" id="tag-tennis" draggable="true" data-word="Tennis">
+                <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M5.5 12a6.5 6.5 0 0 0 13 0"/></svg>
+                Tennis
+            </div>
+
+            <div class="moment-badge">Moment #24</div>
+        </div>
+
+        <!-- 2. 创作层 -->
+        <div class="composition-layer">
+            <div class="title-bar">
+                <span class="section-title">The words you might wanna use</span>
+                <span class="want-more">Want more ?</span>
+            </div>
+
+            <div class="chips-wrapper">
+                <div class="chip" draggable="true" data-word="Vibe">Vibe <span>氛围</span></div>
+                <div class="chip" draggable="true" data-word="Tennis Court">Tennis Court <span>网球场</span></div>
+                <div class="chip" draggable="true" data-word="Vibrant">Vibrant <span>鲜艳的</span></div>
+                <div class="chip" draggable="true" data-word="Crisp">Crisp <span>清爽的</span></div>
+                <div class="chip" draggable="true" data-word="Grip">Grip <span>紧握</span></div>
+                <div class="chip" draggable="true" data-word="Practice">Practice <span>练习</span></div>
+            </div>
+
+            <div class="input-area" id="dropZone">
+                <!-- 监听 input 事件实现高亮检测 -->
+                <div id="editor" contenteditable="true" placeholder="Type or Drag cards here..."></div>
+                
+                <div class="input-footer">
+                    <div class="sound-icon">
+                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path></svg>
+                    </div>
+                    <button class="btn-done">I'm done!</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 3. 新版弹窗结构 -->
+        <div class="modal-overlay" id="modalOverlay">
+            <div class="modal-card">
+                <!-- 心形图标 -->
+                <div class="modal-top-action">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path></svg>
+                </div>
+
+                <!-- 动态内容容器 -->
+                <div id="modalContent">
+                    <!-- 内容将由JS填充，默认显示 Tennis -->
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        // --- 数据源 (Mock Data) ---
+        const dictionary = {
+            'Tennis': {
+                word: 'Tennis',
+                phonetic: "美: ['tenɪs] 英: ['tenɪs]",
+                defTitle: "n. 网球",
+                defDetail: "网球运动 ; 网球鞋 ; 网球杂志",
+                sentences: [
+                    {
+                        type: "level", // 基于水平
+                        en: "I wasn't necessarily playing my best tennis the whole way throughout, but I served well.",
+                        cn: "我从没打过网球，但我要试试，看看我行不行。" 
+                    },
+                    {
+                        type: "scene", // 基于场景
+                        en: "I wasn't necessarily playing my best tennis the whole way throughout",
+                        cn: "" // 截图里第二个例句没有展示中文
+                    }
+                ]
+            },
+            'Tennis Racket': {
+                word: 'Tennis Racket',
+                phonetic: "美: ['rækɪt]",
+                defTitle: "n. 网球拍",
+                defDetail: "运动器材 ; 击球工具",
+                sentences: [
+                    { type: "scene", en: "Hold the tennis racket firmly.", cn: "握紧网球拍。" }
+                ]
+            },
+            'Container': {
+                word: 'Container',
+                phonetic: "['kən'teɪnər]",
+                defTitle: "n. 容器",
+                defDetail: "集装箱 ; 盛具",
+                sentences: [
+                    { type: "scene", en: "The balls are in the container.", cn: "球在容器里。" }
+                ]
+            }
+        };
+
+        // --- 1. 状态管理逻辑 (关键更新) ---
+        const editor = document.getElementById('editor');
+        const allDraggables = document.querySelectorAll('.tag, .chip');
+
+        // 核心函数：检查输入框内容并更新所有 Tag/Chip 的状态
+        function updateTagStates() {
+            const currentText = editor.innerText;
+            
+            allDraggables.forEach(el => {
+                const word = el.getAttribute('data-word');
+                // 简单的字符串包含检测 (Case sensitive matches exact word from data attr)
+                if (currentText.includes(word)) {
+                    el.classList.add('used');
+                } else {
+                    el.classList.remove('used');
+                }
+            });
+        }
+
+        // 监听输入框变化 (打字、删除、粘贴等)
+        editor.addEventListener('input', updateTagStates);
+
+        // --- 2. 拖拽逻辑 ---
+        const dropZone = document.getElementById('dropZone');
+
+        allDraggables.forEach(draggable => {
+            draggable.addEventListener('dragstart', (e) => {
+                let text = draggable.getAttribute('data-word');
+                e.dataTransfer.setData('text/plain', text);
+            });
+        });
+
+        dropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropZone.style.border = '1px dashed var(--primary-orange)';
+        });
+
+        dropZone.addEventListener('dragleave', () => {
+            dropZone.style.border = '1px solid #E5E5EA';
+        });
+
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropZone.style.border = '1px solid #E5E5EA';
+            const text = e.dataTransfer.getData('text/plain');
+            
+            if (text) {
+                insertTagInEditor(text);
+                // 拖入后立即更新状态
+                setTimeout(updateTagStates, 0); 
+            }
+        });
+
+        function insertTagInEditor(text) {
+            editor.focus();
+            const span = document.createElement('span');
+            span.className = 'highlight-word';
+            span.textContent = text;
+            const space = document.createTextNode('\u00A0'); // nbsp
+
+            const sel = window.getSelection();
+            if (sel.rangeCount > 0) {
+                const range = sel.getRangeAt(0);
+                if (editor.contains(range.commonAncestorContainer)) {
+                    range.deleteContents();
+                    range.insertNode(space);
+                    range.insertNode(span);
+                    range.setStartAfter(space);
+                    sel.removeAllRanges();
+                    sel.addRange(range);
+                } else {
+                    editor.appendChild(span);
+                    editor.appendChild(space);
+                }
+            } else {
+                editor.appendChild(span);
+                editor.appendChild(space);
+            }
+        }
+
+        // --- 3. 详情弹窗逻辑 (UI 复刻) ---
+        const modal = document.getElementById('modalOverlay');
+        const modalContent = document.getElementById('modalContent');
+        
+        // 渲染弹窗 HTML
+        function renderModal(data) {
+            let html = `
+                <h1 class="modal-title">${data.word}</h1>
+                <div class="modal-phonetic">${data.phonetic || ''}</div>
+                
+                <div class="modal-def-block">
+                    <div class="modal-def-title">${data.defTitle}</div>
+                    <div class="modal-def-detail">${data.defDetail}</div>
+                </div>
+            `;
+
+            if (data.sentences) {
+                data.sentences.forEach(s => {
+                    const label = s.type === 'level' ? '基于你水平的例句 :' : '基于场景的例句 :';
+                    html += `
+                        <div class="modal-section-label">${label}</div>
+                        <div class="modal-sentence-en">${s.en}</div>
+                        ${s.cn ? `<div class="modal-sentence-cn">${s.cn}</div>` : ''}
+                    `;
+                });
+            }
+
+            modalContent.innerHTML = html;
+        }
+
+        // 绑定点击事件
+        document.querySelectorAll('.tag').forEach(tag => {
+            tag.addEventListener('click', (e) => {
+                e.stopPropagation(); // 防止触发背景上传
+                const word = tag.getAttribute('data-word');
+                // 如果字典里有数据则渲染，没有则使用默认逻辑或 Mock
+                const data = dictionary[word] || dictionary['Tennis']; 
+                renderModal(data);
+                modal.classList.add('active');
+            });
+        });
+
+        // 关闭弹窗
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) {
+                modal.classList.remove('active');
+            }
+        });
+
+        // --- 图片上传 ---
+        function triggerUpload() { document.getElementById('fileInput').click(); }
+        document.getElementById('fileInput').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(event) {
+                    document.getElementById('visionLayer').style.backgroundImage = `url(${event.target.result})`;
+                }
+                reader.readAsDataURL(file);
+            }
+        });
+
+    </script>
+</body>
+</html>

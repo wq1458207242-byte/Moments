@@ -1,0 +1,173 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<div class="profile-page">
+    <div class="profile-header">
+        <a href="{{ url_for('index') }}" class="back-btn" style="text-decoration:none;">←</a>
+        <div class="profile-title">My Profile</div>
+    </div>
+
+    <div class="profile-card">
+        <div class="avatar-wrap">
+            <img id="profileAvatarImg" src="{{ profile.avatar and url_for('static', filename='uploads/' + profile.avatar) or url_for('static', filename='images/mlbzkwwe-3rkp256.png') }}" alt="avatar">
+            <input type="file" id="avatarInput" accept="image/*" style="display:none;">
+            <button class="mini-btn" id="avatarBtn">Change</button>
+        </div>
+        <div class="profile-info">
+            <div class="nickname" id="nicknameText">{{ profile.nickname }}</div>
+            <div class="level-text">{{ profile.level_text }}</div>
+            <div class="energy">
+                <div class="energy-label">Growth Energy</div>
+                <div class="energy-bar">
+                    <div class="energy-progress" style="width: {{ (profile.growth_energy / (profile.growth_goal or 100) * 100) | round(1) }}%;"></div>
+                </div>
+                <div class="energy-value">{{ profile.growth_energy }}/{{ profile.growth_goal }}</div>
+                <div class="energy-tip">Daily goal nearly reached. Keep breathing.</div>
+            </div>
+        </div>
+    </div>
+
+    <a class="btn-primary" id="testBtn">English Proficiency Test</a>
+
+    <!-- Companion Voice section removed -->
+
+    <div class="setting-card">
+        <div class="setting-left">
+            <div class="setting-title">Role Definition</div>
+            <div class="setting-sub">How should I help you today? e.g., Be a strict teacher or a supportive friend...</div>
+        </div>
+        <div class="setting-right">
+            <textarea id="roleDefinition" rows="3" placeholder="Enter role definition">{{ profile.role_definition }}</textarea>
+        </div>
+    </div>
+
+    <div class="setting-card">
+        <div class="setting-left">
+            <div class="setting-title">Voice Package</div>
+            <div class="setting-sub">Choose a unified voice for word cards and sentence reading.</div>
+        </div>
+        <div class="setting-right">
+            <select id="voicePackSelect"></select>
+            <button class="mini-btn" id="voiceTestBtn">Speak Sample</button>
+            <span id="ttsStatusLabel" class="status-badge"></span>
+        </div>
+    </div>
+    <div class="setting-card">
+        <div class="setting-left">
+            <div class="setting-title">Learning Preference</div>
+            <div class="setting-sub">Difficulty level and target level</div>
+        </div>
+        <div class="setting-right">
+            <select id="prefDifficulty">
+                <option value="easy" {% if profile.learning_preference.difficulty == 'easy' %}selected{% endif %}>Easy</option>
+                <option value="medium" {% if profile.learning_preference.difficulty == 'medium' %}selected{% endif %}>Medium</option>
+                <option value="hard" {% if profile.learning_preference.difficulty == 'hard' %}selected{% endif %}>Hard</option>
+            </select>
+            <select id="prefTargetLevel">
+                <option value="A2" {% if profile.learning_preference.target_level == 'A2' %}selected{% endif %}>A2</option>
+                <option value="B1" {% if profile.learning_preference.target_level == 'B1' %}selected{% endif %}>B1</option>
+                <option value="B2" {% if profile.learning_preference.target_level == 'B2' %}selected{% endif %}>B2</option>
+                <option value="C1" {% if profile.learning_preference.target_level == 'C1' %}selected{% endif %}>C1</option>
+            </select>
+        </div>
+    </div>
+
+    <div class="inline-actions">
+        <a class="inline-btn" href="{{ url_for('word_bank') }}">Word Bank ({{ word_bank_count }})</a>
+        <a class="inline-btn" id="notifBtn">Notifications: {{ 'On' if profile.notifications else 'Off' }}</a>
+        <a class="inline-btn" id="privacyBtn">Privacy</a>
+    </div>
+
+    <div class="bottom-space"></div>
+</div>
+
+<script>
+    const avatarBtn = document.getElementById('avatarBtn');
+    const avatarInput = document.getElementById('avatarInput');
+    avatarBtn.addEventListener('click', () => avatarInput.click());
+    avatarInput.addEventListener('change', () => {
+        if (!avatarInput.files || !avatarInput.files.length) return;
+        const fd = new FormData();
+        fd.append('file', avatarInput.files[0]);
+        fetch('{{ url_for("profile_avatar_upload") }}', { method: 'POST', body: fd })
+            .then(res => res.json())
+            .then(data => {
+                if (data.ok) {
+                    const img = document.getElementById('profileAvatarImg');
+                    img.src = data.url;
+                }
+            });
+    });
+
+    function saveProfile(payload) {
+        fetch('{{ url_for("profile_update") }}', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        }).then(res => res.json()).then(() => {});
+    }
+
+    // Voice sample upload removed
+
+    document.getElementById('roleDefinition').addEventListener('change', (e) => {
+        saveProfile({ role_definition: e.target.value });
+    });
+    document.getElementById('prefDifficulty').addEventListener('change', (e) => {
+        saveProfile({ learning_preference: { difficulty: e.target.value } });
+    });
+    document.getElementById('prefTargetLevel').addEventListener('change', (e) => {
+        saveProfile({ learning_preference: { target_level: e.target.value } });
+    });
+    document.getElementById('notifBtn').addEventListener('click', () => {
+        const on = '{{ profile.notifications }}' === 'True';
+        saveProfile({ notifications: !on });
+        location.reload();
+    });
+    document.getElementById('privacyBtn').addEventListener('click', () => {
+        alert('Privacy settings placeholder. Add detailed controls as needed.');
+    });
+    document.getElementById('testBtn').addEventListener('click', () => {
+        window.location.href = '/assessment';
+    });
+    fetch('/companion/state').then(res=>res.json()).then(data=>{
+        const box=document.querySelector('.speech-bubble');
+        if(box){ box.textContent = data.greeting; }
+    }).catch(()=>{});
+
+    // Voice pack select
+    (function(){
+        const sel = document.getElementById('voicePackSelect');
+        const btn = document.getElementById('voiceTestBtn');
+        const label = document.getElementById('ttsStatusLabel');
+        if (!sel) return;
+        fetch('/voice_packs').then(r=>r.json()).then(d=>{
+            const items = (d && d.items) || [];
+            items.forEach(it=>{
+                const opt = document.createElement('option');
+                opt.value = it.id;
+                opt.textContent = it.name;
+                sel.appendChild(opt);
+            });
+            fetch('/profile_voice').then(r=>r.json()).then(p=>{
+                sel.value = p.model || items[0]?.id || 'piper_zh';
+            }).catch(()=>{});
+            if (label) {
+                label.textContent = 'Browser Only';
+                label.className = 'status-badge status-bad';
+            }
+        });
+        sel.addEventListener('change', ()=>{
+            saveProfile({ voice: { model: sel.value } });
+        });
+        if (btn) btn.addEventListener('click', ()=>{
+            const text = 'This is a sample of your current voice package. Hello!';
+            if (window.speakWithProfile) window.speakWithProfile(text);
+            else {
+                const utter = new SpeechSynthesisUtterance(text);
+                window.speechSynthesis.cancel();
+                window.speechSynthesis.speak(utter);
+            }
+        });
+    })();
+</script>
+{% endblock %}

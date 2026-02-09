@@ -1,0 +1,123 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<div class="phone-frame refine-page">
+    <div class="refine-header-bg" style="background-image: url('{{ url_for('static', filename='uploads/' + image) }}');"></div>
+
+    <div class="refine-header-nav">
+        <a class="refine-nav-left" href="{{ url_for('camera') }}" style="text-decoration:none;">
+            <div class="refine-back-icon">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
+            </div>
+            <span>Last step</span>
+        </a>
+        <div class="refine-date-display">
+            <div class="refine-date-main">January 31th</div>
+            <span class="refine-date-sub">2026</span>
+        </div>
+    </div>
+
+    <div class="refine-scroll-container">
+        <div class="refine-user-text-card" id="editor" contenteditable="true">{% for p in parts -%}{% if p.type == 'highlight' -%}<span id="{{ p.target_id }}" class="refine-segment refine-seg-{{ p.color }}" data-target-id="{{ p.target_id }}">{{ p.content }}</span>{%- else -%}{{ p.content }}{%- endif -%}{%- endfor %}
+            <div class="refine-audio-icon-row" contenteditable="false">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#1C1C1E" stroke-width="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path></svg>
+            </div>
+        </div>
+
+        <div class="refine-feedback-row">
+            <div class="refine-feedback-bubble">{{ comment }}</div>
+            <div class="refine-ai-avatar">OwO</div>
+        </div>
+
+        <div class="recommendation-section">
+            <div class="refine-section-header">
+                <div class="refine-orange-line"></div>
+                <span class="refine-section-title">Blow are recommended version of expresssion:</span>
+            </div>
+
+            {% for rec in recs %}
+                <div class="rec-card {{ rec.color }}" draggable="true" data-target="{{ rec.target_id }}" data-text="{{ rec.text }}">{{ rec.text }}</div>
+            {% endfor %}
+
+            <div style="margin-top: -8px;">
+                <span class="refine-want-more">Want more ?</span>
+            </div>
+        </div>
+
+        <button class="save-btn" id="saveBtn">Save and Done!</button>
+
+        <form id="saveForm" action="{{ url_for('save_diary') }}" method="post" style="display:none;">
+            <input type="hidden" name="image" value="{{ image }}">
+            <input type="hidden" name="content" id="finalContent">
+        </form>
+    </div>
+
+    <div class="modal-overlay" id="knowledgeModal">
+        <div class="modal-card" id="knowledgeCard">
+            <div class="modal-top-action" id="knowledgeClose">✕</div>
+            <div id="knowledgeContent"></div>
+        </div>
+    </div>
+</div>
+
+<script>
+    const knowledge = {{ (knowledge or {}) | tojson }};
+
+    function replaceText(targetId, text) {
+        const target = document.getElementById(targetId);
+        if (!target) return;
+        target.textContent = (text || '').trim();
+        target.classList.remove('animate-change');
+        void target.offsetWidth;
+        target.classList.add('animate-change');
+    }
+
+    document.querySelectorAll('.rec-card').forEach(card => {
+        const targetId = card.getAttribute('data-target');
+        const text = card.getAttribute('data-text');
+        card.addEventListener('click', () => replaceText(targetId, text));
+        card.addEventListener('dragstart', (e) => {
+            e.dataTransfer.setData('text/plain', JSON.stringify({ targetId, text }));
+        });
+    });
+
+    document.querySelectorAll('.refine-segment').forEach(seg => {
+        const targetId = seg.getAttribute('id');
+        seg.addEventListener('dragover', (e) => e.preventDefault());
+        seg.addEventListener('drop', (e) => {
+            e.preventDefault();
+            try {
+                const payload = JSON.parse(e.dataTransfer.getData('text/plain') || '{}');
+                if (payload && payload.text) {
+                    replaceText(targetId, payload.text);
+                }
+            } catch (_) {}
+        });
+
+        seg.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const data = knowledge[targetId];
+            if (!data) return;
+            const kc = document.getElementById('knowledgeContent');
+            kc.innerHTML = `
+                <div class="refine-knowledge-title">${(data.improved || data.original || '').replaceAll('<','&lt;').replaceAll('>','&gt;')}</div>
+                <div class="refine-knowledge-sub">${data.explanation_cn ? data.explanation_cn.replaceAll('<','&lt;').replaceAll('>','&gt;') : ''}</div>
+            `;
+            document.getElementById('knowledgeModal').classList.add('active');
+        });
+    });
+
+    const km = document.getElementById('knowledgeModal');
+    document.getElementById('knowledgeClose').addEventListener('click', () => km.classList.remove('active'));
+    km.addEventListener('click', (e) => {
+        if (e.target === km) km.classList.remove('active');
+    });
+    document.getElementById('knowledgeCard').addEventListener('click', (e) => e.stopPropagation());
+
+    document.getElementById('saveBtn').addEventListener('click', () => {
+        const content = document.getElementById('editor').innerText.replace(/\s+/g, ' ').trim();
+        document.getElementById('finalContent').value = content;
+        document.getElementById('saveForm').submit();
+    });
+</script>
+{% endblock %}

@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Moments Stack Timeline</title>
+    <style>
+        :root {
+            --primary-green: #34C759;
+            --primary-orange: #FF6B00;
+            --text-dark: #1C1C1E;
+            --text-gray: #8E8E93;
+            --bg-color: #F9F9F9;
+        }
+
+        * {
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            margin: 0;
+            background-color: #222;
+            display: flex;
+            justify-content: center;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        .phone-frame {
+            width: 100%;
+            max-width: 414px; /* iPhone Max width */
+            height: 100%;
+            background-color: white;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        /* --- 1. Header & Calendar (保持不变) --- */
+        .header {
+            padding-top: 50px;
+            background: white;
+            z-index: 10;
+            /* 底部细线 */
+            border-bottom: 0.5px solid rgba(0,0,0,0.1);
+        }
+
+        .nav-bar {
+            display: flex; align-items: center; padding: 10px 20px;
+        }
+        .back-btn { font-size: 24px; color: #666; margin-right: 20px; cursor: pointer; }
+        .month-title { font-size: 20px; font-family: 'Georgia', serif; font-weight: bold; margin-right: auto; }
+
+        .calendar-strip { display: flex; justify-content: space-between; padding: 10px 20px 15px; }
+        .cal-day { display: flex; flex-direction: column; align-items: center; font-size: 11px; color: var(--text-gray); gap: 4px; }
+        .cal-day.active { color: var(--primary-green); font-weight: bold; }
+        .cal-day.active::after { content: ''; width: 4px; height: 4px; background: var(--primary-green); border-radius: 50%; }
+
+        /* --- 2. Vertical Timeline --- */
+        .timeline-scroll {
+            flex: 1;
+            overflow-y: auto;
+            padding-bottom: 40px;
+            background-color: #fff;
+        }
+
+        .day-section {
+            padding: 24px 0 30px;
+            /* 分割线 */
+            position: relative;
+        }
+        
+        .date-header {
+            padding: 0 20px 20px;
+            display: flex; justify-content: space-between; align-items: center;
+        }
+        .date-text { font-family: 'Georgia', serif; font-size: 28px; color: var(--primary-green); letter-spacing: -0.5px; }
+        .date-text span { font-size: 12px; color: var(--text-dark); font-family: sans-serif; margin-left: 4px; vertical-align: middle; font-weight: normal; }
+        .date-text.black { color: var(--text-dark); }
+
+        .open-btn {
+            background: var(--primary-green); color: white;
+            padding: 8px 18px; border-radius: 20px;
+            font-size: 15px; font-weight: 600;
+            display: flex; align-items: center; gap: 6px;
+            box-shadow: 0 4px 10px rgba(52, 199, 89, 0.3);
+        }
+        .open-btn.dark { background: #2C2C2E; box-shadow: 0 4px 10px rgba(0,0,0,0.2); }
+
+        /* --- 3. Stacked Card Carousel (重点修改部分) --- */
+        .card-carousel {
+            display: flex;
+            overflow-x: auto;
+            /* 强制滚动吸附 */
+            scroll-snap-type: x mandatory; 
+            padding: 20px 50% 40px 20px; /* 右侧留白很大，保证最后一张能划到左边 */
+            gap: 0; /* 不需要 gap，用 margin 控制重叠 */
+            scrollbar-width: none;
+            perspective: 1000px; /* 3D透视 */
+            align-items: center;
+        }
+        .card-carousel::-webkit-scrollbar { display: none; }
+
+        .moment-card {
+            flex: 0 0 280px; /* 固定宽度，约屏幕宽度的 75% */
+            height: 420px;
+            border-radius: 24px;
+            position: relative;
+            background-size: cover;
+            background-position: center;
+            scroll-snap-align: start; /* 左对齐吸附 */
+            margin-right: -180px; /* 负边距！制造大幅重叠效果 */
+            
+            /* 默认状态 (未激活) */
+            transform-style: preserve-3d;
+            transition: transform 0.1s linear, filter 0.1s linear, z-index 0s;
+            box-shadow: -5px 5px 20px rgba(0,0,0,0.2); /* 阴影在左侧，增强层级感 */
+            background-color: #eee;
+            border: 2px solid #fff; /* 白色描边 */
+        }
+        
+        /* 标签样式 */
+        .tag {
+            position: absolute;
+            background: rgba(255, 255, 255, 0.95);
+            padding: 6px 14px;
+            border-radius: 20px;
+            display: flex; align-items: center; gap: 6px;
+            font-size: 12px; font-weight: 600; color: var(--primary-orange);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            cursor: pointer; z-index: 5;
+            transform: translateZ(20px); /* 让标签浮起来一点 */
+        }
+        .tag svg { width: 14px; height: 14px; fill: currentColor; }
+
+        .pos-1 { top: 40%; left: 35%; }
+        .pos-2 { top: 55%; right: 10%; }
+        .pos-3 { bottom: 25%; left: 25%; }
+        
+        .moment-badge {
+            position: absolute; bottom: 20px; left: 20px;
+            background: rgba(0,0,0,0.6); color: white;
+            padding: 4px 8px; border-radius: 6px; font-size: 10px;
+            backdrop-filter: blur(4px);
+        }
+        .date-stamp {
+            position: absolute; top: 20px; right: 20px;
+            color: white; font-family: 'Georgia', serif; font-size: 20px;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.8);
+        }
+
+        /* --- 4. Modal (保持不变) --- */
+        .modal-overlay {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.2); z-index: 100;
+            display: none; align-items: center; justify-content: center;
+            opacity: 0; transition: opacity 0.2s;
+            backdrop-filter: blur(2px);
+        }
+        .modal-overlay.active { display: flex; opacity: 1; }
+        .word-card {
+            width: 85%; background: white; border-radius: 24px;
+            padding: 30px 24px; box-shadow: 0 20px 50px rgba(0,0,0,0.2);
+            position: relative; transform: translateY(20px);
+            transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            border: 4px solid #E5E5EA;
+        }
+        .modal-overlay.active .word-card { transform: translateY(0); }
+        .close-modal { position: absolute; top: 20px; right: 20px; color: #ccc; cursor: pointer; }
+        .wc-title { font-family: 'Georgia', serif; font-size: 42px; color: var(--primary-orange); margin: 0; line-height: 1.2; }
+        .wc-phonetic { color: #8E8E93; font-size: 14px; margin-bottom: 20px; font-family: sans-serif; }
+        .wc-def { font-weight: bold; font-size: 16px; margin-bottom: 8px; color: #333; }
+        .wc-section-title { color: var(--primary-orange); font-size: 14px; margin-top: 20px; margin-bottom: 8px; }
+        .wc-en { font-size: 15px; font-weight: 600; line-height: 1.4; color: #1C1C1E; margin-bottom: 6px; }
+        .wc-cn { font-size: 13px; color: #666; margin-bottom: 15px; }
+
+    </style>
+</head>
+<body>
+
+    <div class="phone-frame">
+        
+        <!-- Header -->
+        <div class="header">
+            <div class="nav-bar">
+                <div class="back-btn">
+                     <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 8 8 12 12 16"></polyline><line x1="16" y1="12" x2="8" y2="12"></line></svg>
+                </div>
+                <div class="month-title">Jan.</div>
+                <div style="font-size: 10px; color: #888;">
+                    SUN&nbsp;&nbsp;MON&nbsp;&nbsp;<span style="color:#34C759">TUE</span>&nbsp;&nbsp;WED&nbsp;&nbsp;THU&nbsp;&nbsp;FRI&nbsp;&nbsp;<span style="color:#34C759">SAT</span><br>
+                    25&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;26&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span style="color:#34C759">27</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;28&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;29&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;30&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span style="color:#34C759">31</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Vertical Scroll -->
+        <div class="timeline-scroll">
+
+            <!-- Day 1: January 31st -->
+            <div class="day-section">
+                <div class="date-header">
+                    <div class="date-text">January 31st <span>2026</span></div>
+                    <div class="open-btn">Open 
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><line x1="9" y1="3" x2="9" y2="21"></line></svg>
+                    </div>
+                </div>
+
+                <!-- 堆叠卡片容器 (Stack) -->
+                <div class="card-carousel" id="carousel-1">
+                    <!-- Card 1 -->
+                    <div class="moment-card" style="background-image: url('https://images.unsplash.com/photo-1545167622-3a6ac756afa4?q=80&w=1000&auto=format&fit=crop');">
+                         <div class="moment-badge">Moment #22</div>
+                    </div>
+                    <!-- Card 2 -->
+                    <div class="moment-card" style="background-image: url('https://images.unsplash.com/photo-1622394879223-96e8e8946764?q=80&w=1000&auto=format&fit=crop');">
+                        <div class="moment-badge">Moment #23</div>
+                         <div class="tag pos-3" onclick="openModal('Court')">
+                             <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/></svg> Court
+                        </div>
+                    </div>
+                    <!-- Card 3 (Focus) -->
+                    <div class="moment-card" style="background-image: url('https://images.unsplash.com/photo-1626246947526-7d6360c77464?q=80&w=1000&auto=format&fit=crop');">
+                        <div class="date-stamp">January 31th</div>
+                        <div class="moment-badge">Moment #24</div>
+                        
+                        <div class="tag pos-1" onclick="openModal('Tennis')">
+                            <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z"/></svg>
+                            Tennis
+                        </div>
+                        <div class="tag pos-2" onclick="openModal('Racket')">
+                             <svg viewBox="0 0 24 24"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+                            Tennis
+                        </div>
+                    </div>
+                     <!-- Card 4 -->
+                    <div class="moment-card" style="background-image: url('https://images.unsplash.com/photo-1595435934249-5df7ed86e1c0?q=80&w=1000&auto=format&fit=crop');">
+                         <div class="moment-badge">Moment #25</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Day 2: February 1st -->
+            <div class="day-section">
+                <div class="date-header">
+                    <div class="date-text black">February 1st <span>2026</span></div>
+                    <div class="open-btn dark">Open
+                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><line x1="9" y1="3" x2="9" y2="21"></line></svg>
+                    </div>
+                </div>
+
+                <div class="card-carousel" id="carousel-2">
+                    <div class="moment-card" style="background-image: url('https://images.unsplash.com/photo-1513258496099-48168024aec0?q=80&w=1000&auto=format&fit=crop');">
+                         <div class="moment-badge">Moment #01</div>
+                    </div>
+                    <div class="moment-card" style="background-image: url('https://images.unsplash.com/photo-1456513080510-7bf3a84b82f8?q=80&w=1000&auto=format&fit=crop');">
+                        <div class="date-stamp">February 1st</div>
+                         <div class="moment-badge">Moment #02</div>
+                         <div class="tag pos-3" onclick="openModal('Study')">
+                             <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z"/></svg>
+                            Study
+                        </div>
+                        <div class="tag pos-1" onclick="openModal('Tennis')">
+                            <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/></svg> Tennis
+                        </div>
+                    </div>
+                    <div class="moment-card" style="background-image: url('https://images.unsplash.com/photo-1517649763962-0c623066013b?q=80&w=1000&auto=format&fit=crop');">
+                         <div class="moment-badge">Moment #03</div>
+                         <div class="tag pos-2" onclick="openModal('Tennis')">
+                            <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/></svg> Tennis
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Modal -->
+        <div class="modal-overlay" id="modalOverlay">
+            <div class="word-card">
+                <div class="close-modal" onclick="closeModal()">
+                    <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"></path></svg>
+                </div>
+                <div style="position:absolute; top:24px; left:24px; color:#ccc;">
+                     <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path></svg>
+                </div>
+                <h1 class="wc-title" id="wc-word">Tennis</h1>
+                <div class="wc-phonetic">美: ['tenɪs] 英: ['tenɪs]</div>
+                <div class="wc-def">n. 网球</div>
+                <div class="wc-sub-def">网球运动 ; 网球鞋 ; 网球杂志</div>
+                <div class="wc-section-title">基于你水平的例句 :</div>
+                <div class="wc-en">I wasn't necessarily playing my best tennis the whole way throughout...</div>
+                <div class="wc-cn">我从没打过网球，但我要试试，看看我行不行。</div>
+                <div class="wc-section-title">基于场景的例句 :</div>
+                <div class="wc-en">I wasn't necessarily playing my best tennis the whole way throughout</div>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        // --- 核心：堆叠卡片动画逻辑 ---
+        function updateCarousel(carousel) {
+            const cards = carousel.querySelectorAll('.moment-card');
+            const containerCenter = carousel.getBoundingClientRect().left + carousel.offsetWidth / 2;
+            
+            cards.forEach((card, index) => {
+                const rect = card.getBoundingClientRect();
+                const cardCenter = rect.left + rect.width / 2;
+                
+                // 计算卡片中心与容器中心的距离
+                const distance = cardCenter - containerCenter;
+                // 归一化距离 (为了计算缩放比例)
+                const normalizedDistance = distance / rect.width; 
+                
+                // 基础缩放和层级逻辑
+                let scale = 1;
+                let zIndex = 1;
+                let brightness = 1;
+
+                if (Math.abs(normalizedDistance) < 0.5) {
+                    // 当前激活的卡片 (Focus)
+                    scale = 1;
+                    zIndex = 10;
+                    brightness = 1;
+                } else if (normalizedDistance > 0) {
+                    // 右侧的卡片 (Next)
+                    // 稍微变小，向左挤压(通过CSS margin-left实现堆叠，这里只控制缩放)
+                    scale = 1 - (normalizedDistance * 0.2); 
+                    zIndex = 5 - Math.floor(normalizedDistance);
+                    brightness = 0.6;
+                } else {
+                    // 左侧的卡片 (Prev)
+                    scale = 1 - (Math.abs(normalizedDistance) * 0.2);
+                    zIndex = 5 - Math.floor(Math.abs(normalizedDistance));
+                    brightness = 0.6;
+                }
+                
+                // 限制 scale 范围
+                if (scale < 0.8) scale = 0.8;
+
+                // 应用样式
+                card.style.transform = `scale(${scale})`;
+                card.style.zIndex = zIndex;
+                card.style.filter = `brightness(${brightness})`;
+            });
+        }
+
+        // 初始化所有 carousel 的监听
+        const carousels = document.querySelectorAll('.card-carousel');
+        
+        carousels.forEach(carousel => {
+            // 滚动时实时更新
+            carousel.addEventListener('scroll', () => {
+                window.requestAnimationFrame(() => updateCarousel(carousel));
+            });
+            
+            // 初始化位置（自动滚动到第三张卡片模拟截图效果）
+            // 注意：这里简单滚动到大约位置，实际可能需要更精确的计算
+            setTimeout(() => {
+                if(carousel.id === 'carousel-1') {
+                     carousel.scrollLeft = 250; 
+                }
+                updateCarousel(carousel);
+            }, 100);
+        });
+
+
+        // --- Modal 逻辑 (保持不变) ---
+        const modal = document.getElementById('modalOverlay');
+        const wordTitle = document.getElementById('wc-word');
+        const dictionary = { 'Tennis': 'Tennis', 'Racket': 'Racket', 'Court': 'Court', 'Study': 'Study' };
+
+        function openModal(wordKey) {
+            wordTitle.innerText = dictionary[wordKey] || wordKey;
+            modal.classList.add('active');
+        }
+        function closeModal() {
+            modal.classList.remove('active');
+        }
+        modal.addEventListener('click', (e) => {
+            if(e.target === modal) closeModal();
+        });
+
+    </script>
+</body>
+</html>

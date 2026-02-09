@@ -1,0 +1,191 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<div class="assessment-page">
+  <div class="header">
+    <div class="mascot">👻</div>
+    <div class="title">Word Collection</div>
+    <div class="subtitle">Tap the words you know</div>
+  </div>
+
+  <div class="word-grid" id="wordGrid"></div>
+
+  <div class="fab-container">
+    <button class="btn-finish" id="roundBtn">
+      <span id="roundLabel">Next</span>
+      <span id="counter">0 collected</span>
+    </button>
+  </div>
+
+  <div class="modal-overlay" id="resultModal">
+    <div class="modal-card">
+      <div class="score-circle">
+        <span class="score-number" id="vocabSize">0</span>
+        <span class="score-label">Words</span>
+      </div>
+      <div class="level-badge" id="cefrLevel">A1</div>
+      <div class="desc">Your companion is tuned to your pace.</div>
+      <a class="btn-start" href="{{ url_for('profile') }}">Back</a>
+    </div>
+  </div>
+</div>
+
+<style>
+.assessment-page{padding:20px}
+.header{text-align:center;margin-bottom:16px;margin-top:10px}
+.mascot{font-size:36px;display:inline-block}
+.title{font-size:20px;font-weight:800;color:#2C3E50}
+.subtitle{font-size:12px;color:#666}
+.word-grid{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;padding-bottom:100px}
+.chip{background:#fff;border:2px solid #EFEFEF;border-radius:16px;padding:10px 16px;font-size:16px;cursor:pointer;transition:transform .2s;user-select:none;box-shadow:0 2px 5px rgba(0,0,0,.05)}
+.chip.sel{background:#8EB897;border-color:#8EB897;color:#fff;transform:scale(1.06)}
+.fab-container{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);width:90%;max-width:380px;z-index:10}
+.btn-finish{width:100%;background:#2C3E50;color:#fff;border:none;padding:14px;border-radius:18px;font-size:16px;font-weight:700;box-shadow:0 10px 25px rgba(44,62,80,.3);display:flex;justify-content:space-between;align-items:center}
+.modal-overlay{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.5);backdrop-filter:blur(5px);display:none;justify-content:center;align-items:center;z-index:100}
+.modal-card{background:#FDFBF7;width:90%;max-width:360px;border-radius:24px;padding:24px;text-align:center;box-shadow:0 20px 50px rgba(0,0,0,.2);border:6px solid #fff}
+.score-circle{width:120px;height:120px;background:#8EB897;border-radius:50%;margin:0 auto 12px;display:flex;flex-direction:column;justify-content:center;align-items:center;color:#fff}
+.score-number{font-size:32px;font-weight:800}
+.score-label{font-size:12}
+.level-badge{background:#FF9F76;color:#fff;padding:6px 16px;border-radius:20px;font-weight:700;display:inline-block;margin-bottom:10px;font-size:14px}
+.desc{font-size:13px;color:#666;margin-bottom:12px}
+.btn-start{display:block;background:transparent;border:2px solid #2C3E50;color:#2C3E50;padding:10px 18px;border-radius:12px;font-weight:700;text-decoration:none}
+</style>
+
+<script>
+const pool = {
+  1:["Apple","Time","Happy","Friend","Color","Walk","Door","Water","Book","Fast"],
+  2:["Weather","Decide","Journey","Memory","Simple","Avoid","Bright","Quiet","Custom","Budget"],
+  3:["Creative","Solution","Efficient","Atmosphere","Generous","Hesitate","Precise","Context","Expand","Balance"],
+  4:["Subtle","Inevitable","Profound","Reluctant","Allocate","Diminish","Mature","Novel","Sustain","Vivid"],
+  5:["Ambiguous","Eloquence","Scrutinize","Ubiquitous","Ephemeral","Pragmatic","Conspicuous","Perennial","Intrinsic","Meticulous"],
+  6:["Sesquipedalian","Defenestrate","Anfractuous","Obfuscatory","Apophasis","Esurient","Lachrymose","Peregrinate"] // C2 sample
+};
+const bandSizes={1:500,2:1000,3:2000,4:4000,5:7000,6:10000}; // A1..C2
+const fakeWords=["Florp","Zentive","Marnish","Vellumx","Quasp","Norlane"];
+let round=1;
+let selected={1:0,2:0,3:0,4:0,5:0,6:0};
+let presented={1:0,2:0,3:0,4:0,5:0,6:0};
+let nonPresented=0, nonClicks=0;
+let focusBand='mid'; // 'low' A1–A2, 'mid' B1–B2, 'high' C1–C2
+let grid=document.getElementById('wordGrid');
+let counter=document.getElementById('counter');
+let roundBtn=document.getElementById('roundBtn');
+let roundLabel=document.getElementById('roundLabel');
+const roundInfo=document.createElement('div');
+roundInfo.style.cssText='text-align:center;font-size:12px;color:#888;margin-top:-6px;margin-bottom:8px';
+roundInfo.textContent='Round 1 / 3';
+document.querySelector('.header').appendChild(roundInfo);
+const tiltInfo=document.createElement('div');
+tiltInfo.style.cssText='text-align:center;font-size:12px;color:#8EB897;margin-top:-6px;margin-bottom:10px';
+document.querySelector('.header').appendChild(tiltInfo);
+
+function shuffle(a){for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a}
+function pick(level,count){const arr=shuffle((pool[level]||[]).slice());return arr.slice(0,count)}
+function putChip(text,lvl,isFake=false){
+  const chip=document.createElement('div');
+  chip.className='chip';
+  chip.textContent=text;
+  chip.dataset.level=lvl;
+  chip.dataset.fake=isFake?'1':'0';
+  if(isFake) nonPresented++;
+  else presented[lvl]=(presented[lvl]||0)+1;
+  chip.addEventListener('click',()=>{
+    chip.classList.toggle('sel');
+    const inc=chip.classList.contains('sel')?1:-1;
+    if(chip.dataset.fake==='1'){ nonClicks+=inc>0?1:-1; }
+    else {
+      const lv=parseInt(chip.dataset.level,10);
+      selected[lv]+=inc;
+    }
+    const total=[...grid.querySelectorAll('.chip.sel')].length;
+    counter.textContent=total+' collected';
+  });
+  grid.appendChild(chip);
+}
+
+function composeRound(){
+  grid.innerHTML='';
+  counter.textContent='0 collected';
+  if(round<3) roundLabel.textContent='Next'; else roundLabel.textContent="I'm done!";
+  roundInfo.textContent=`Round ${round} / 3`;
+  tiltInfo.textContent='';
+  const TOTAL=28;
+  let dist={1:0,2:0,3:0,4:0,5:0,6:0};
+  // Round 1: calibration across A2–C2（含少量A1）
+  if(round===1){
+    dist={1:4,2:6,3:6,4:6,5:4,6:2};
+    focusBand='mid';
+  }
+  // Round 2: differentiation based on R1 hit rates
+  if(round===2){
+    const lowSamples=(presented[1]||0)+(presented[2]||0);
+    const midSamples=(presented[3]||0)+(presented[4]||0);
+    const highSamples=(presented[5]||0)+(presented[6]||0);
+    const lowHits=(selected[1]||0)+(selected[2]||0);
+    const midHits=(selected[3]||0)+(selected[4]||0);
+    const highHits=(selected[5]||0)+(selected[6]||0);
+    const lowRate=lowSamples>0?lowHits/lowSamples:0;
+    const midRate=midSamples>0?midHits/midSamples:0;
+    const highRate=highSamples>0?highHits/highSamples:0;
+    const lowScore=lowRate*lowSamples;
+    const midScore=midRate*midSamples;
+    const highScore=highRate*highSamples;
+    if(highRate>=0.3 || (highScore>=midScore && highScore>=lowScore)){
+      focusBand='high'; dist={1:1,2:2,3:4,4:9,5:8,6:4};
+    }else if(midRate>=0.4 || (midScore>=lowScore)){
+      focusBand='mid'; dist={1:2,2:3,3:10,4:9,5:4,6:0};
+    }else{
+      focusBand='low'; dist={1:10,2:9,3:5,4:3,5:1,6:0};
+    }
+  }
+  // Round 3: precision test in focus band + more non-words
+  if(round===3){
+    if(focusBand==='high'){ dist={1:0,2:1,3:3,4:10,5:9,6:6}; }
+    else if(focusBand==='low'){ dist={1:12,2:12,3:3,4:1,5:0,6:0}; }
+    else { dist={1:1,2:2,3:12,4:10,5:3,6:0}; }
+  }
+  // present words by distribution
+  Object.keys(dist).forEach(l=>{
+    const level=parseInt(l,10);
+    pick(level,dist[level]).forEach(w=>putChip(w,level,false));
+  });
+  // add non-words
+  const fakeCount= round===3 ? 3 : 1;
+  shuffle(fakeWords.slice()).slice(0,fakeCount).forEach(f=>putChip(f,0,true));
+  tiltInfo.textContent = `Focus: ${focusBand.toUpperCase()} • A1:${dist[1]} A2:${dist[2]} B1:${dist[3]} B2:${dist[4]} C1:${dist[5]} C2:${dist[6]} • Non:${fakeCount}`;
+}
+composeRound();
+
+function estimate(){
+  const falseAlarmRate = nonPresented>0 ? Math.max(0, Math.min(1, nonClicks / nonPresented)) : 0;
+  let V=0;
+  [1,2,3,4,5,6].forEach(l=>{
+    const hitRate = presented[l]>0 ? Math.max(0, Math.min(1, selected[l]/presented[l])) : 0;
+    V += hitRate * (bandSizes[l]||0);
+  });
+  V = Math.round(V * (1 - falseAlarmRate));
+  let cefr="A1";
+  if(V>1500) cefr="A2";
+  if(V>3000) cefr="B1";
+  if(V>5000) cefr="B2";
+  if(V>8000) cefr="C1";
+  if(V>10000) cefr="C2";
+  return {vocab:V,cefr,falseAlarmRate};
+}
+
+roundBtn.addEventListener('click',()=>{
+  if(round<3){ round++; composeRound(); return; }
+  const r=estimate();
+  document.getElementById('vocabSize').textContent=r.vocab;
+  document.getElementById('cefrLevel').textContent=r.cefr;
+  const modal=document.getElementById('resultModal');
+  modal.style.display='flex';
+  modal.style.opacity='1';
+  fetch('/assessment/submit',{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({raw_score:0,ce_fr_level:r.cefr,estimated_vocab:r.vocab,far:r.falseAlarmRate})
+  }).catch(()=>{});
+});
+</script>
+{% endblock %}
