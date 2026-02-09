@@ -19,17 +19,7 @@
                 <div class="section-header">Your Moments</div>
                 <div class="badge-green">{{ photos_count }} Photos</div>
             </div>
-            {% set L = moments|length %}
-            {% if L >= 3 %}
-            {% set container_h = 320 + ((L - 3 + 1) * 260) + 480 %}
-            {% elif L == 2 %}
-            {% set container_h = 48 + 420 + 240 %}
-            {% elif L == 1 %}
-            {% set container_h = 420 + 240 %}
-            {% else %}
-            {% set container_h = 240 %}
-            {% endif %}
-            <div style="position:relative; min-height: {{ container_h }}px;">
+            <div id="moments-container" style="position:relative; min-height: 600px;">
                 {% set m1 = moments[0] if moments|length >= 1 else None %}
                 {% set m2 = moments[1] if moments|length >= 2 else None %}
                 {% set m3 = moments[2] if moments|length >= 3 else None %}
@@ -176,6 +166,26 @@
 
     <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
     <script>
+    // Auto-fit moments container height to actual stacked cards to remove blank space
+    (function tuneContainerHeight() {
+        const container = document.getElementById('moments-container');
+        if (!container) return;
+        function adjustMinHeight() {
+            let maxBottom = 0;
+            container.querySelectorAll('.moment-wrapper').forEach(w => {
+                maxBottom = Math.max(maxBottom, w.offsetTop + w.offsetHeight);
+            });
+            const target = Math.max(480, Math.round(maxBottom + 24));
+            container.style.minHeight = target + 'px';
+        }
+        // Initial adjust after layout
+        setTimeout(adjustMinHeight, 0);
+        // Recalculate on resize
+        window.addEventListener('resize', () => setTimeout(adjustMinHeight, 50));
+        // Observe mutations (e.g., captions edited)
+        const mo = new MutationObserver(() => setTimeout(adjustMinHeight, 50));
+        mo.observe(container, { childList: true, subtree: true });
+    })();
     /* === TAB NAVIGATION (Quick Jump) === */
     const tabs = document.querySelectorAll('.tab');
     
