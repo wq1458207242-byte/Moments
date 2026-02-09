@@ -1,4 +1,15 @@
 # Moments - AI English Learning Companion
+# Moments - AI English Learning Companion
+---
+title: Moments - AI English Learning Companion
+entry_file: app.py
+app_port: 7860
+tags:
+  - AI
+  - English-Learning
+  - Multimodal
+description: 通过图像与文本交互的英语学习助手，支持外部访问 0.0.0.0:7860，并使用环境变量管理密钥（MODELSCOPE_KEY）。
+---
 
 ## Setup
 1. Install dependencies:
