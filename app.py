@@ -1209,6 +1209,44 @@ def _generate_word_card_with_ai(word, scene_hint):
     data["degraded"] = False
     return data
 
+def _generate_phrase_card_with_ai(text, kind="phrase"):
+    profile = _load_profile()
+    pref = profile.get("learning_preference", {}) if isinstance(profile.get("learning_preference", {}), dict) else {}
+    target_level = str(pref.get("target_level", "B1"))
+    prompt = f"""
+    You are an English learning assistant. Create a concise learning card for the {kind}: "{text}".
+    Output ONLY valid JSON with keys:
+    - text: original input
+    - translation_cn: short, natural Chinese translation (<= 20 chars)
+    - usage_tips: array of 2-3 concise tips (each <= 30 chars, Chinese)
+    - examples_en: a CEFR {target_level} level example sentence using the {kind}
+    - examples_cn: Chinese translation of the example
+    Constraints:
+    - Keep it short and beginner-friendly.
+    - Avoid markdown code fences.
+    """
+    response = _chat_completion_with_timeout(
+        model=TEXT_MODEL_ID,
+        messages=[{'role': 'user', 'content': prompt}],
+        timeout_s=15,
+    )
+    content = response.choices[0].message.content
+    content = content.replace("```json", "").replace("```", "").strip()
+    if "{" in content and "}" in content:
+        content = content[content.find("{"):content.rfind("}") + 1]
+    data = json.loads(content)
+    if not isinstance(data, dict):
+        raise ValueError("phrase card response is not a JSON object")
+    out = {
+        "text": str(data.get("text", text)).strip(),
+        "translation_cn": str(data.get("translation_cn", "")).strip(),
+        "usage_tips": data.get("usage_tips") if isinstance(data.get("usage_tips"), list) else [],
+        "examples_en": str(data.get("examples_en", "")).strip(),
+        "examples_cn": str(data.get("examples_cn", "")).strip(),
+        "degraded": False,
+    }
+    return out
+
 @app.route('/ai_debug', methods=['GET'])
 def ai_debug():
     fn = request.args.get('filename') or ''
@@ -1261,6 +1299,28 @@ def api_word_card():
     _save_word_cards_store(store)
     WORD_CARD_CACHE[cache_key] = card
     _append_energy("anon", "open_word_card", 1)
+    return jsonify(card)
+
+@app.route('/api/phrase_card')
+def api_phrase_card():
+    q = (request.args.get('q') or "").strip()
+    kind = (request.args.get('kind') or "phrase").strip().lower()
+    if not q:
+        return jsonify({"error": "missing q"}), 400
+    try:
+        if not MODELSCOPE_KEY:
+            raise RuntimeError("modelscope_api_key_missing")
+        card = _generate_phrase_card_with_ai(q, kind=kind)
+    except Exception:
+        card = {
+            "text": q,
+            "translation_cn": "",
+            "usage_tips": [],
+            "examples_en": q,
+            "examples_cn": "",
+            "degraded": True,
+        }
+    _append_energy("anon", "open_phrase_card", 1)
     return jsonify(card)
 
 @app.route('/polish', methods=['POST'])
