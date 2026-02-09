@@ -254,6 +254,9 @@
         const half = n / 2;
         let d = ((diff % n) + n) % n;
         if (d > half) d -= n;
+        if (Number.isInteger(half) && Math.abs(d) === half) {
+            d = diff < 0 ? -half : half;
+        }
         return d;
     }
 
