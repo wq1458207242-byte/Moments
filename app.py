@@ -499,18 +499,24 @@ def _heuristic_word_card(word, scene_hint):
         "degraded": True,
     }
 
-def _chat_completion_with_timeout(model, messages, timeout_s=20):
+def _chat_completion_with_timeout(model, messages, timeout_s=60):
+    """
+    Wraps OpenAI chat completion with a strict timeout and detailed error logging.
+    """
+    def _do_request():
+        return client.chat.completions.create(model=model, messages=messages)
+
     with concurrent.futures.ThreadPoolExecutor(max_workers=1) as ex:
-        fut = ex.submit(client.chat.completions.create, model=model, messages=messages)
+        fut = ex.submit(_do_request)
         try:
             return fut.result(timeout=timeout_s)
-        except Exception:
-            # Fallback to responses.create for compatibility
-            def _resp():
-                txt = "\n".join([m.get("content","") for m in messages if m.get("role")=="user"])
-                return client.responses.create(model=model, input=txt)
-            fut2 = ex.submit(_resp)
-            return fut2.result(timeout=timeout_s)
+        except concurrent.futures.TimeoutError:
+            print(f"[AI Error] Request timed out after {timeout_s}s")
+            raise TimeoutError(f"AI request timed out after {timeout_s}s")
+        except Exception as e:
+            print(f"[AI Error] Exception during completion: {e}")
+            # Re-raise to let caller handle or try next variant
+            raise e
 
 def _load_moments():
     try:
@@ -858,7 +864,7 @@ def analyze_image_with_ai(image_path, level="B1"):
                 response = _chat_completion_with_timeout(
                     model=MULTIMODAL_MODEL_ID,
                     messages=msgs,
-                    timeout_s=20,
+                    timeout_s=60,
                 )
                 content = response.choices[0].message.content
                 content = content.replace("```json", "").replace("```", "").strip()
