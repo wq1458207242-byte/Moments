@@ -19,8 +19,17 @@
                 <div class="section-header">Your Moments</div>
                 <div class="badge-green">{{ photos_count }} Photos</div>
             </div>
-            {% set extra = (moments|length - 3) if moments|length > 3 else 0 %}
-            <div style="position:relative; min-height: {{ 520 + (extra * 260) }}px;">
+            {% set L = moments|length %}
+            {% if L >= 3 %}
+            {% set container_h = 320 + ((L - 3 + 1) * 260) + 480 %}
+            {% elif L == 2 %}
+            {% set container_h = 48 + 420 + 240 %}
+            {% elif L == 1 %}
+            {% set container_h = 420 + 240 %}
+            {% else %}
+            {% set container_h = 240 %}
+            {% endif %}
+            <div style="position:relative; min-height: {{ container_h }}px;">
                 {% set m1 = moments[0] if moments|length >= 1 else None %}
                 {% set m2 = moments[1] if moments|length >= 2 else None %}
                 {% set m3 = moments[2] if moments|length >= 3 else None %}
@@ -70,7 +79,7 @@
                 {% endif %}
                 {% for m in moments[3:] %}
                 {% set idx = loop.index0 %}
-                <div class="moment-wrapper" data-idx="{{ idx + 4 }}" style="position:absolute; top: {{ 320 + (idx * 260) }}px; left:50%; transform:translateX(-50%) rotate({{ -1 if (loop.index is odd) else 1 }}deg); width:90%; z-index:20; transition:transform .25s, filter .25s;">
+                <div class="moment-wrapper" data-idx="{{ idx + 4 }}" style="position:absolute; top: {{ 320 + ((idx + 1) * 260) }}px; left:50%; transform:translateX(-50%) rotate({{ -1 if (loop.index is odd) else 1 }}deg); width:90%; z-index:20; transition:transform .25s, filter .25s;">
                     <div style="background:#fff; border-radius:16px; box-shadow:0 10px 24px rgba(0,0,0,0.12); padding:12px;">
                         <div class="image-card" style="aspect-ratio:16/9; border-radius:14px; position:relative; margin-bottom:10px; background-image:url('{{ url_for('static', filename='uploads/' + m.image) }}');"></div>
                         <p class="section-text" style="font-size:13px; color:#475569; padding:0 4px;">
