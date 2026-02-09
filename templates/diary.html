@@ -19,8 +19,7 @@
                 <div class="section-header">Your Moments</div>
                 <div class="badge-green">{{ photos_count }} Photos</div>
             </div>
-            {% set extra = (moments|length - 3) if moments|length > 3 else 0 %}
-            <div style="position:relative; min-height: {{ 520 + (extra * 260) }}px;">
+            <div id="moments-container" style="position:relative; min-height: 600px;">
                 {% set m1 = moments[0] if moments|length >= 1 else None %}
                 {% set m2 = moments[1] if moments|length >= 2 else None %}
                 {% set m3 = moments[2] if moments|length >= 3 else None %}
@@ -70,7 +69,7 @@
                 {% endif %}
                 {% for m in moments[3:] %}
                 {% set idx = loop.index0 %}
-                <div class="moment-wrapper" data-idx="{{ idx + 4 }}" style="position:absolute; top: {{ 320 + (idx * 260) }}px; left:50%; transform:translateX(-50%) rotate({{ -1 if (loop.index is odd) else 1 }}deg); width:90%; z-index:20; transition:transform .25s, filter .25s;">
+                <div class="moment-wrapper" data-idx="{{ idx + 4 }}" style="position:absolute; top: {{ 320 + ((idx + 1) * 260) }}px; left:50%; transform:translateX(-50%) rotate({{ -1 if (loop.index is odd) else 1 }}deg); width:90%; z-index:20; transition:transform .25s, filter .25s;">
                     <div style="background:#fff; border-radius:16px; box-shadow:0 10px 24px rgba(0,0,0,0.12); padding:12px;">
                         <div class="image-card" style="aspect-ratio:16/9; border-radius:14px; position:relative; margin-bottom:10px; background-image:url('{{ url_for('static', filename='uploads/' + m.image) }}');"></div>
                         <p class="section-text" style="font-size:13px; color:#475569; padding:0 4px;">
@@ -92,10 +91,10 @@
                 <div class="section-header">Daily Journal</div>
                 <span style="color:#2bee6c;">📝</span>
             </div>
-            <div style="display:flex; gap:10px; overflow-x:auto; padding-bottom:8px;">
-                <button class="chip" style="background:#2bee6c; color:#0e1c12; font-weight:700;">☕ Describe the taste of this coffee...</button>
-                <button class="chip">� What made you smile?</button>
-                <button class="chip">☀️ How was the weather?</button>
+            <div style="display:flex; gap:10px; overflow-x:auto; padding-bottom:8px;" id="diary-recs">
+                {% for r in recs %}
+                <button class="chip" data-text="{{ r }}">{{ r }}</button>
+                {% endfor %}
             </div>
             {% if content %}
                 <p class="section-text" id="diary-display-text">{{ content }}</p>
@@ -123,8 +122,8 @@
                 <div id="letterBody" style="max-height:0; overflow:hidden; transition:max-height .3s ease; padding:0 4px;">
                     <div style="padding-top:12px;">
                         <div class="letter-sub">🐾 From your companion</div>
-                        <div id="letterText" class="section-text" style="white-space:pre-wrap; margin-top:8px;"></div>
-                        <button id="genLetterBtn" class="save-btn" style="width:100%; margin-top:12px;">Generate Letter</button>
+                        <div id="letterText" class="section-text" style="white-space:pre-wrap; margin-top:8px;">{{ daily_letter }}</div>
+                        <button id="genLetterBtn" class="save-btn" style="width:100%; margin-top:12px; display:none;">Generate Letter</button>
                     </div>
                 </div>
             </div>
@@ -167,6 +166,26 @@
 
     <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
     <script>
+    // Auto-fit moments container height to actual stacked cards to remove blank space
+    (function tuneContainerHeight() {
+        const container = document.getElementById('moments-container');
+        if (!container) return;
+        function adjustMinHeight() {
+            let maxBottom = 0;
+            container.querySelectorAll('.moment-wrapper').forEach(w => {
+                maxBottom = Math.max(maxBottom, w.offsetTop + w.offsetHeight);
+            });
+            const target = Math.max(480, Math.round(maxBottom + 24));
+            container.style.minHeight = target + 'px';
+        }
+        // Initial adjust after layout
+        setTimeout(adjustMinHeight, 0);
+        // Recalculate on resize
+        window.addEventListener('resize', () => setTimeout(adjustMinHeight, 50));
+        // Observe mutations (e.g., captions edited)
+        const mo = new MutationObserver(() => setTimeout(adjustMinHeight, 50));
+        mo.observe(container, { childList: true, subtree: true });
+    })();
     /* === TAB NAVIGATION (Quick Jump) === */
     const tabs = document.querySelectorAll('.tab');
     
@@ -255,15 +274,36 @@
 
     Array.from(document.querySelectorAll('.moment-wrapper')).forEach(w => {
         const orig = w.style.transform || '';
-        w.addEventListener('mouseenter', () => {
+        let lpTimer = null, sx = 0, sy = 0, activated = false;
+        function activate() {
+            activated = true;
             w.style.zIndex = '999';
             w.style.transform = orig + ' scale(1.045)';
             w.style.filter = 'brightness(1.04)';
-        });
-        w.addEventListener('mouseleave', () => {
+        }
+        function deactivate() {
+            activated = false;
             w.style.zIndex = '';
             w.style.transform = orig;
             w.style.filter = '';
+        }
+        w.addEventListener('mouseenter', () => activate());
+        w.addEventListener('mouseleave', () => deactivate());
+        w.addEventListener('pointerdown', (e) => {
+            sx = e.clientX; sy = e.clientY;
+            lpTimer = setTimeout(activate, 500);
+        });
+        w.addEventListener('pointermove', (e) => {
+            if (lpTimer && !activated) {
+                const dx = e.clientX - sx, dy = e.clientY - sy;
+                if (dx*dx + dy*dy > 100) { clearTimeout(lpTimer); lpTimer = null; }
+            }
+        });
+        ['pointerup','pointercancel','pointerleave'].forEach(ev => {
+            w.addEventListener(ev, () => {
+                if (lpTimer) { clearTimeout(lpTimer); lpTimer = null; }
+                deactivate();
+            });
         });
     });
 

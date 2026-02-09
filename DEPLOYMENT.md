@@ -13,7 +13,6 @@ pip install -r requirements.txt
 Create `config.ini` in the project root:
 ```ini
 [modelscope]
-api_key=
 base_url=https://api-inference.modelscope.cn/v1
 model_id=Qwen/Qwen3-VL-235B-A22B-Instruct
 
@@ -24,7 +23,7 @@ rate_default=1.0
 pitch_default=1.0
 ```
 Environment variables can override these keys:
-`MODELSCOPE_API_KEY`, `MODELSCOPE_BASE_URL`, `MODEL_ID`, `TTS_MAX_PER_MINUTE`, `TTS_MAX_CONCURRENCY`, `TTS_RATE_DEFAULT`, `TTS_PITCH_DEFAULT`.
+`MODELSCOPE_KEY`, `MODELSCOPE_BASE_URL`, `MODEL_ID`, `TTS_MAX_PER_MINUTE`, `TTS_MAX_CONCURRENCY`, `TTS_RATE_DEFAULT`, `TTS_PITCH_DEFAULT`.
 
 ## Run
 ```bash

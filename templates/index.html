@@ -47,4 +47,18 @@
         </a>
     </div>
 </div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        fetch('/companion/state')
+            .then(r => r.json())
+            .then(data => {
+                const bubble = document.querySelector('.speech-bubble');
+                if(bubble && data.greeting) {
+                    bubble.textContent = data.greeting;
+                }
+            })
+            .catch(e => console.error(e));
+    });
+</script>
 {% endblock %}

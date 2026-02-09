@@ -33,12 +33,17 @@
         </div>
 
         <div class="chips-wrapper">
-            {% for verb in analysis.verbs %}
-            <div class="chip" draggable="true" data-word="{{ verb }}">{{ verb }} <span>verb</span></div>
+            {% for phrase in analysis.support_phrases %}
+            <div class="chip" draggable="true" data-word="{{ phrase }}">{{ phrase }}</div>
             {% endfor %}
-            {% for adj in analysis.adjectives %}
-            <div class="chip" draggable="true" data-word="{{ adj }}">{{ adj }} <span>adj</span></div>
-            {% endfor %}
+            {% if not analysis.support_phrases %}
+                {% for verb in analysis.verbs %}
+                <div class="chip" draggable="true" data-word="{{ verb }}">{{ verb }} <span>verb</span></div>
+                {% endfor %}
+                {% for adj in analysis.adjectives %}
+                <div class="chip" draggable="true" data-word="{{ adj }}">{{ adj }} <span>adj</span></div>
+                {% endfor %}
+            {% endif %}
         </div>
 
         <div class="input-area" id="dropZone">
